@@ -1,6 +1,6 @@
 #!/bin/bash
 ##########################################################################
-# This is the EOSIO automated install script for Linux and Mac OS.
+# This is the VEXANIUM automated install script for Linux and Mac OS.
 # This file was downloaded from https://github.com/EOSIO/eos
 #
 # Copyright (c) 2017, Respective Authors all rights reserved.
@@ -31,11 +31,12 @@
 ##########################################################################
 
 VERSION=2.1 # Build script version
-CMAKE_BUILD_TYPE=Release
-export DISK_MIN=20
+#CMAKE_BUILD_TYPE=Release
+CMAKE_BUILD_TYPE=Debug
+export DISK_MIN=5
 DOXYGEN=false
 ENABLE_COVERAGE_TESTING=false
-CORE_SYMBOL_NAME="SYS"
+CORE_SYMBOL_NAME="VEX"
 START_MAKE=true
 
 TIME_BEGIN=$( date -u +%s )
@@ -272,7 +273,7 @@ pushd $SRC_LOCATION &> /dev/null
 popd &> /dev/null
 
 printf "\\n========================================================================\\n"
-printf "======================= Starting EOSIO Build =======================\\n"
+printf "======================= Starting VEXANIUM Build =======================\\n"
 printf "## CMAKE_BUILD_TYPE=%s\\n" "${CMAKE_BUILD_TYPE}"
 printf "## ENABLE_COVERAGE_TESTING=%s\\n" "${ENABLE_COVERAGE_TESTING}"
 
@@ -283,7 +284,7 @@ $CMAKE -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}" -DCMAKE_CXX_COMPILER="${CXX_COMP
    -DCMAKE_C_COMPILER="${C_COMPILER}" -DCORE_SYMBOL_NAME="${CORE_SYMBOL_NAME}" \
    -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT_DIR}" -DBUILD_MONGO_DB_PLUGIN=true \
    -DENABLE_COVERAGE_TESTING="${ENABLE_COVERAGE_TESTING}" -DBUILD_DOXYGEN="${DOXYGEN}" \
-   -DCMAKE_INSTALL_PREFIX=$OPT_LOCATION/eosio $LOCAL_CMAKE_FLAGS "${REPO_ROOT}"
+   -DCMAKE_INSTALL_PREFIX=$OPT_LOCATION/vexanium $LOCAL_CMAKE_FLAGS "${REPO_ROOT}"
 if [ $? -ne 0 ]; then exit -1; fi
 make -j"${JOBS}"
 if [ $? -ne 0 ]; then exit -1; fi
@@ -292,16 +293,16 @@ cd $REPO_ROOT
 
 TIME_END=$(( $(date -u +%s) - $TIME_BEGIN ))
 
-printf "${bldred}\n\n _______  _______  _______ _________ _______\n"
-printf '(  ____ \(  ___  )(  ____ \\\\__   __/(  ___  )\n'
-printf "| (    \/| (   ) || (    \/   ) (   | (   ) |\n"
-printf "| (__    | |   | || (_____    | |   | |   | |\n"
-printf "|  __)   | |   | |(_____  )   | |   | |   | |\n"
-printf "| (      | |   | |      ) |   | |   | |   | |\n"
-printf "| (____/\| (___) |/\____) |___) (___| (___) |\n"
-printf "(_______/(_______)\_______)\_______/(_______)\n\n${txtrst}"
+printf "\n\n${bldred}\t _     _  _______  _     _  _______  _______  _______  _______ \n"
+printf "\t( |   | )(  ____ \| |   | |(  ____ \(  ___  )(  ____ )(  ____ \ \n"
+printf "\t| |   | || (    \/| |   | || (    \/| (   ) || (    )|| (    \/\n"
+printf "\t| |   | || (__     \ \ / / | |      | |   | || (____)|| (__    \n"
+printf "\t| |   | ||  __)     )   (  | |      | |   | ||     __)|  __)   \n"
+printf "\t| |   | || (       / / \ \ | |      | |   | || (\ (   | (      \n"
+printf "\t \ \ / / | (____/\| |   | || (____/\| (___) || ) \ \__| (____/\ \n"
+printf "\t  \___/  (_______/|_|   |_|(_______/(_______)|/   \__/(_______/\n\n${txtrst}"
 
-printf "\\nEOSIO has been successfully built. %02d:%02d:%02d\\n" $(($TIME_END/3600)) $(($TIME_END%3600/60)) $(($TIME_END%60))
+printf "\\VEXANIUM has been successfully built. %02d:%02d:%02d\\n" $(($TIME_END/3600)) $(($TIME_END%3600/60)) $(($TIME_END%60))
 printf "==============================================================================================\\n${bldred}"
 printf "(Optional) Testing Instructions:\\n"
 print_instructions
@@ -309,9 +310,5 @@ printf "${BIN_LOCATION}/mongod --dbpath ${MONGODB_DATA_LOCATION} -f ${MONGODB_CO
 printf "cd ./build && PATH=\$PATH:$HOME/opt/mongodb/bin make test\\n" # PATH is set as currently 'mongo' binary is required for the mongodb test
 printf "${txtrst}==============================================================================================\\n"
 printf "For more information:\\n"
-printf "EOSIO website: https://eos.io\\n"
-printf "EOSIO Telegram channel @ https://t.me/EOSProject\\n"
-printf "EOSIO resources: https://eos.io/resources/\\n"
-printf "EOSIO Stack Exchange: https://eosio.stackexchange.com\\n"
-printf "EOSIO wiki: https://github.com/EOSIO/eos/wiki\\n\\n\\n"
+printf "VEXANIUM website: https://vexanium.com\\n"
 

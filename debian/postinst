@@ -8,8 +8,8 @@
 
 set -e
 
-PACKAGE="eosio"
-USER="eosio"
+PACKAGE="vexanium"
+USER="vexanium"
 GROUP=${USER}
 
 # summary of how this script can be called:

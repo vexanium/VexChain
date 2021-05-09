@@ -1,7 +1,7 @@
 #performed in a small separate "cmake script" so can easily run on each build
 
 execute_process(
-   COMMAND @GIT_EXECUTABLE@ describe --tags --dirty
+   COMMAND @GIT_EXECUTABLE@ describe --tags
    OUTPUT_VARIABLE VERSION_STRING
    OUTPUT_STRIP_TRAILING_WHITESPACE
    RESULT_VARIABLE res

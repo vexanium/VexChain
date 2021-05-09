@@ -32,20 +32,20 @@ printf "Disk install: ${DISK_INSTALL}\\n"
 printf "Disk space total: ${DISK_TOTAL}G\\n"
 printf "Disk space available: ${DISK_AVAIL}G\\n"
 
-if [ "${MEM_GIG}" -lt 7 ]; then
+if [ "${MEM_GIG}" -lt 4 ]; then
 	echo "Your system must have 7 or more Gigabytes of physical memory installed."
 	echo "Exiting now."
 	exit 1
 fi
 
 if [ "${OS_MIN}" -lt 12 ]; then
-	echo "You must be running Mac OS 10.12.x or higher to install EOSIO."
+	echo "You must be running Mac OS 10.12.x or higher to install VEXANIUM."
 	echo "Exiting now."
 	exit 1
 fi
 
 if [ "${DISK_AVAIL}" -lt "$DISK_MIN" ]; then
-	echo "You must have at least ${DISK_MIN}GB of available storage to install EOSIO."
+	echo "You must have at least ${DISK_MIN}GB of available storage to install VEXANIUM."
 	echo "Exiting now."
 	exit 1
 fi
@@ -71,7 +71,7 @@ printf " - Ruby installation found @ ${RUBY}\\n"
 printf "Checking Home Brew installation...\\n"
 if ! BREW=$( command -v brew )
 then
-	printf "Homebrew must be installed to compile EOS.IO!\\n"
+	printf "Homebrew must be installed to compile VEXANIUM!\\n"
 	if [ $ANSWER != 1 ]; then read -p "Do you wish to install HomeBrew? (y/n)? " ANSWER; fi
 	case $ANSWER in
 		1 | [Yy]* )
@@ -119,7 +119,7 @@ if [ ! -d /usr/local/Frameworks ]; then
 fi
 
 if [ $COUNT -gt 1 ]; then
-	printf "\\nThe following dependencies are required to install EOSIO:\\n"
+	printf "\\nThe following dependencies are required to install VEXANIUM:\\n"
 	printf "${DISPLAY}\\n\\n"
 	if [ $ANSWER != 1 ]; then read -p "Do you wish to install these packages? (y/n) " ANSWER; fi
 	case $ANSWER in

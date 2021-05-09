@@ -1,6 +1,6 @@
 # Run in docker
 
-Simple and fast setup of EOS.IO on Docker is also available.
+Simple and fast setup of VEXANIUM on Docker is also available.
 
 ## Install Dependencies
 
@@ -26,7 +26,7 @@ The above will build off the most recent commit to the master branch by default.
 docker build -t eosio/eos:v1.7.4 --build-arg branch=v1.7.4 .
 ```
 
-By default, the symbol in eosio.system is set to SYS. You can override this using the symbol argument while building the docker image.
+By default, the symbol in vex.system is set to SYS. You can override this using the symbol argument while building the docker image.
 
 ```bash
 docker build -t eosio/eos --build-arg symbol=<symbol> .
@@ -135,9 +135,9 @@ docker volume rm keosd-data-volume
 
 Docker Hub images are now deprecated. New build images were discontinued on January 1st, 2019. The existing old images will be removed on June 1st, 2019.
 
-### EOSIO Testnet
+### VEXANIUM Testnet
 
-We can easily set up a EOSIO local testnet using docker images. Just run the following commands:
+We can easily set up a VEXANIUM local testnet using docker images. Just run the following commands:
 
 Note: if you want to use the mongo db plugin, you have to enable it in your `data-dir/config.ini` first.
 

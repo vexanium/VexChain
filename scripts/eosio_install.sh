@@ -1,6 +1,6 @@
 #!/bin/bash
 ##########################################################################
-# This is the EOSIO automated install script for Linux and Mac OS.
+# This is the VEXANIUM automated install script for Linux and Mac OS.
 # This file was downloaded from https://github.com/EOSIO/eos
 #
 # Copyright (c) 2017, Respective Authors all rights reserved.
@@ -59,28 +59,25 @@ if ! pushd "${BUILD_DIR}" &> /dev/null;then
 fi
 
 if ! make install; then
-   printf "\\nMAKE installing EOSIO has exited with the above error.\\n\\n"
+   printf "\\nMAKE installing VEXANIUM has exited with the above error.\\n\\n"
    exit -1
 fi
 popd &> /dev/null 
 
-printf "\n${bldred}      ___           ___           ___                       ___\n"
-printf "     /  /\\         /  /\\         /  /\\        ___          /  /\\ \n"
-printf "    /  /:/_       /  /::\\       /  /:/_      /  /\\        /  /::\\ \n"
-printf "   /  /:/ /\\     /  /:/\\:\\     /  /:/ /\\    /  /:/       /  /:/\\:\\ \n"
-printf "  /  /:/ /:/_   /  /:/  \\:\\   /  /:/ /::\\  /__/::\\      /  /:/  \\:\\ \n"
-printf " /__/:/ /:/ /\\ /__/:/ \\__\\:\\ /__/:/ /:/\\:\\ \\__\\/\\:\\__  /__/:/ \\__\\:\\ \n"
-printf " \\  \\:\\/:/ /:/ \\  \\:\\ /  /:/ \\  \\:\\/:/~/:/    \\  \\:\\/\\ \\  \\:\\ /  /:/ \n"
-printf "  \\  \\::/ /:/   \\  \\:\\  /:/   \\  \\::/ /:/      \\__\\::/  \\  \\:\\  /:/ \n"
-printf "   \\  \\:\\/:/     \\  \\:\\/:/     \\__\\/ /:/       /__/:/    \\  \\:\\/:/ \n"
-printf "    \\  \\::/       \\  \\::/        /__/:/        \\__\\/      \\  \\::/ \n"
-printf "     \\__\\/         \\__\\/         \\__\\/                     \\__\\/ \n\n${txtrst}"
+printf "\n\n${bldred}\t ______   _______  _______  _______  _______  _______  _______ \n"
+printf "\t( |   | )(  ____ \| |   | |(  ____ \(  ___  )(  ____ )(  ____ \ \n"
+printf "\t| |   | || (    \/| |   | || (    \/| (   ) || (    )|| (    \/\n"
+printf "\t| |   | || (__     \ \ / / | |      | |   | || (____)|| (__    \n"
+printf "\t| |   | ||  __)     )   (  | |      | |   | ||     __)|  __)   \n"
+printf "\t| |   | || (       / / \ \ | |      | |   | || (\ (   | (      \n"
+printf "\t \ \ / / | (____/\| |   | || (____/\| (___) || ) \ \__| (____/\ \n"
+printf "\t  \___/  (_______/| |   | |(_______/(_______)|/   \__/(_______/\n\n${txtrst}"
 
 printf "==============================================================================================\\n"
-printf "EOSIO has been installed into ${OPT_LOCATION}/eosio/bin!\\n"
+printf "VEXANIUM has been installed into ${OPT_LOCATION}/eosio/bin!\\n"
 printf "If you need to, you can fully uninstall using eosio_uninstall.sh && scripts/clean_old_install.sh.\\n"
 printf "==============================================================================================\\n\\n"
 
-printf "EOSIO website: https://eos.io\\n"
-printf "EOSIO resources: https://eos.io/resources/\\n"
-printf "EOSIO Stack Exchange: https://eosio.stackexchange.com\\n"
+printf "VEXANIUM website: https://eos.io\\n"
+printf "VEXANIUM resources: https://eos.io/resources/\\n"
+printf "VEXANIUM Stack Exchange: https://eosio.stackexchange.com\\n"
