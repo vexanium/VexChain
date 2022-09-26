@@ -1,6 +1,7 @@
 #include <fc/network/http/http_client.hpp>
 #include <fc/io/json.hpp>
 #include <fc/scoped_exit.hpp>
+#include <fc/static_variant.hpp>
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
@@ -38,7 +39,7 @@ public:
 #ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
    using unix_socket_ptr = std::unique_ptr<local::stream_protocol::socket>;
 #endif
-   using connection = static_variant<raw_socket_ptr, ssl_socket_ptr
+   using connection = std::variant<raw_socket_ptr, ssl_socket_ptr
 #ifdef BOOST_ASIO_HAS_LOCAL_SOCKETS
                                      , unix_socket_ptr
 #endif
@@ -72,7 +73,7 @@ public:
    template<typename SyncReadStream, typename Fn, typename CancelFn>
    error_code sync_do_with_deadline( SyncReadStream& s, deadline_type deadline, Fn f, CancelFn cf ) {
       bool timer_expired = false;
-      boost::asio::deadline_timer timer(s.get_io_service());
+      boost::asio::deadline_timer timer(_ioc);
 
       timer.expires_at(deadline);
       bool timer_cancelled = false;
@@ -85,11 +86,11 @@ public:
          }
       });
 
-      optional<error_code> f_result;
+      std::optional<error_code> f_result;
       f(f_result);
 
-      s.get_io_service().restart();
-      while (s.get_io_service().run_one())
+      _ioc.restart();
+      while (_ioc.run_one())
       {
          if (f_result) {
             timer_cancelled = true;
@@ -115,10 +116,10 @@ public:
 
    template<typename SyncReadStream>
    error_code sync_connect_with_timeout( SyncReadStream& s, const std::string& host, const std::string& port,  const deadline_type& deadline ) {
-      tcp::resolver local_resolver(s.get_io_service());
+      tcp::resolver local_resolver(_ioc);
       bool cancelled = false;
 
-      auto res = sync_do_with_deadline(s, deadline, [&local_resolver, &cancelled, &s, &host, &port](optional<error_code>& final_ec){
+      auto res = sync_do_with_deadline(s, deadline, [&local_resolver, &cancelled, &s, &host, &port](std::optional<error_code>& final_ec){
          local_resolver.async_resolve(host, port, [&cancelled, &s, &final_ec](const error_code& ec, tcp::resolver::results_type resolved ){
             if (ec) {
                final_ec.emplace(ec);
@@ -141,7 +142,7 @@ public:
 
    template<typename SyncReadStream>
    error_code sync_write_with_timeout(SyncReadStream& s, http::request<http::string_body>& req, const deadline_type& deadline ) {
-      return sync_do_with_deadline(s, deadline, [&s, &req](optional<error_code>& final_ec){
+      return sync_do_with_deadline(s, deadline, [&s, &req](std::optional<error_code>& final_ec){
          http::async_write(s, req, [&final_ec]( const error_code& ec, std::size_t ) {
             final_ec.emplace(ec);
          });
@@ -150,7 +151,7 @@ public:
 
    template<typename SyncReadStream>
    error_code sync_read_with_timeout(SyncReadStream& s, boost::beast::flat_buffer& buffer, http::response<http::string_body>& res, const deadline_type& deadline ) {
-      return sync_do_with_deadline(s, deadline, [&s, &buffer, &res](optional<error_code>& final_ec){
+      return sync_do_with_deadline(s, deadline, [&s, &buffer, &res](std::optional<error_code>& final_ec){
          http::async_read(s, buffer, res, [&final_ec]( const error_code& ec, std::size_t ) {
             final_ec.emplace(ec);
          });
@@ -213,7 +214,7 @@ public:
 
       error_code ec = sync_connect_with_timeout(ssl_socket->next_layer(), *dest.host(), dest.port() ? std::to_string(*dest.port()) : "443", deadline);
       if (!ec) {
-         ec = sync_do_with_deadline(ssl_socket->next_layer(), deadline, [&ssl_socket](optional<error_code>& final_ec) {
+         ec = sync_do_with_deadline(ssl_socket->next_layer(), deadline, [&ssl_socket](std::optional<error_code>& final_ec) {
             ssl_socket->async_handshake(ssl::stream_base::client, [&final_ec](const error_code& ec) {
                final_ec.emplace(ec);
             });
@@ -259,7 +260,7 @@ public:
    };
 
    bool check_closed( const connection_map::iterator& conn_itr ) {
-      if (conn_itr->second.visit(check_closed_visitor())) {
+      if (std::visit(check_closed_visitor(), conn_itr->second)) {
          _connections.erase(conn_itr);
          return true;
       } else {
@@ -337,7 +338,7 @@ public:
       req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
       req.set(http::field::content_type, "application/json");
       req.keep_alive(true);
-      req.body() = json::to_string(payload);
+      req.body() = json::to_string(payload, _deadline);
       req.prepare_payload();
 
       auto conn_iter = get_connection(dest, deadline);
@@ -346,7 +347,7 @@ public:
       });
 
       // Send the HTTP request to the remote host
-      error_code ec = conn_iter->second.visit(write_request_visitor(this, req, deadline));
+      error_code ec = std::visit(write_request_visitor(this, req, deadline), conn_iter->second);
       FC_ASSERT(!ec, "Failed to send request: ${message}", ("message",ec.message()));
 
       // This buffer is used for reading and must be persisted
@@ -356,7 +357,7 @@ public:
       http::response<http::string_body> res;
 
       // Receive the HTTP response
-      ec = conn_iter->second.visit(read_response_visitor(this, buffer, res, deadline));
+      ec = std::visit(read_response_visitor(this, buffer, res, deadline), conn_iter->second);
       FC_ASSERT(!ec, "Failed to read response: ${message}", ("message",ec.message()));
 
       // if the connection can be kept open, keep it open
@@ -364,7 +365,12 @@ public:
          eraser.cancel();
       }
 
-      auto result = json::from_string(res.body());
+      fc::variant result;
+      if( !res.body().empty() ) {
+         try {
+            result = json::from_string( res.body() );
+         } catch( ... ) {}
+      }
       if (res.result() == http::status::internal_server_error) {
          fc::exception_ptr excp;
          try {
@@ -372,8 +378,7 @@ public:
             excp = std::make_shared<fc::exception>(err_var["code"].as_int64(), err_var["name"].as_string(), err_var["what"].as_string());
 
             if (err_var.contains("details")) {
-               auto details = err_var["details"].get_array();
-               for (const auto dvar : details) {
+               for (const auto& dvar : err_var["details"].get_array()) {
                   excp->append_log(FC_LOG_MESSAGE(error, dvar.get_object()["message"].as_string()));
                }
             }
@@ -426,7 +431,7 @@ public:
       if(socket_file.empty())
          FC_THROW_EXCEPTION( parse_error_exception, "couldn't discover socket path");
       url_path = "/" / url_path;
-      return _unix_url_paths.emplace(full_url, fc::url("unix", socket_file.string(), ostring(), ostring(), url_path.string(), ostring(), ovariant_object(), fc::optional<uint16_t>())).first->second;
+      return _unix_url_paths.emplace(full_url, fc::url("unix", socket_file.string(), ostring(), ostring(), url_path.string(), ostring(), ovariant_object(), std::optional<uint16_t>())).first->second;
    }
 #endif
 

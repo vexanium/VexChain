@@ -38,7 +38,7 @@ namespace fc { namespace crypto { namespace r1 {
           private_key_impl()
           :_key(nullptr)
           {
-          static int init = init_openssl();
+            init_openssl();
           }
           ~private_key_impl()
           {
@@ -66,7 +66,7 @@ namespace fc { namespace crypto { namespace r1 {
     // Perform ECDSA key recovery (see SEC1 4.1.6) for curves over (mod p)-fields
     // recid selects which key is recovered
     // if check is non-zero, additional checks are performed
-    static int ECDSA_SIG_recover_key_GFp(EC_KEY *eckey, ECDSA_SIG *ecsig, const unsigned char *msg, int msglen, int recid, int check)
+    int ECDSA_SIG_recover_key_GFp(EC_KEY *eckey, ECDSA_SIG *ecsig, const unsigned char *msg, int msglen, int recid, int check)
     {
         if (!eckey) FC_THROW_EXCEPTION( exception, "null key" );
 
@@ -319,7 +319,7 @@ namespace fc { namespace crypto { namespace r1 {
       array<char, 37> data;
       memcpy(data.data, key.begin(), key.size());
       memcpy(data.begin() + key.size(), (const char*)&check, sizeof(check));
-      return fc::to_base58(data.begin(), data.size());
+      return fc::to_base58(data.begin(), data.size(), fc::yield_function_t());
     }
 
     public_key public_key::from_base58( const std::string& b58 )

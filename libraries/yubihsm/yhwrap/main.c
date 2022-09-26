@@ -177,7 +177,7 @@ static FILE *open_file(const char *name, bool input) {
     if (strcmp(name, "-") == 0) {
       return stdout;
     } else {
-      return fopen(name, "w");
+      return fopen(name, "wb");
     }
   }
 }
@@ -437,6 +437,8 @@ int main(int argc, char *argv[]) {
   rc = EXIT_SUCCESS;
 
 main_exit:
+
+  cmdline_parser_free(&args_info);
 
   if (input_file != NULL) {
     fclose(input_file);

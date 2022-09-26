@@ -1,7 +1,3 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE
- */
 #include <appbase/application.hpp>
 
 #include <eosio/wallet_plugin/yubihsm_wallet.hpp>
@@ -14,8 +10,6 @@
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/asio/posix/stream_descriptor.hpp>
 #include <boost/dll/runtime_symbol_info.hpp>
-
-#include <dlfcn.h>
 
 namespace eosio { namespace wallet {
 
@@ -125,7 +119,7 @@ struct yubihsm_wallet_impl {
 
    void prime_keepalive_timer() {
       keepalive_timer.expires_at(std::chrono::steady_clock::now() + std::chrono::seconds(20));
-      keepalive_timer.async_wait([this](auto ec){
+      keepalive_timer.async_wait([this](const boost::system::error_code& ec){
          if(ec || !session)
             return;
 
@@ -139,10 +133,10 @@ struct yubihsm_wallet_impl {
       });
    }
 
-   optional<signature_type> try_sign_digest(const digest_type d, const public_key_type public_key) {
+   std::optional<signature_type> try_sign_digest(const digest_type d, const public_key_type public_key) {
       auto it = _keys.find(public_key);
       if(it == _keys.end())
-         return optional<signature_type>{};
+         return std::optional<signature_type>();
 
       size_t der_sig_sz = 128;
       uint8_t der_sig[der_sig_sz];
@@ -257,15 +251,17 @@ bool yubihsm_wallet::import_key(string wif_key) {
 }
 
 string yubihsm_wallet::create_key(string key_type) {
-   return (string)my->create();
+   EOS_ASSERT(key_type.empty() || key_type == "R1", chain::unsupported_key_type_exception, "YubiHSM wallet only supports R1 keys");
+   return my->create().to_string();
 }
 
 bool yubihsm_wallet::remove_key(string key) {
    FC_ASSERT(!is_locked());
+   FC_THROW_EXCEPTION(chain::wallet_exception, "YubiHSM wallet does not currently support removal of keys");
    return true;
 }
 
-optional<signature_type> yubihsm_wallet::try_sign_digest(const digest_type digest, const public_key_type public_key) {
+std::optional<signature_type> yubihsm_wallet::try_sign_digest(const digest_type digest, const public_key_type public_key) {
    return my->try_sign_digest(digest, public_key);
 }
 

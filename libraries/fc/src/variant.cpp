@@ -7,6 +7,7 @@
 #include <boost/scoped_array.hpp>
 #include <fc/reflect/variant.hpp>
 #include <fc/io/json.hpp>
+#include <fc/utf8.hpp>
 #include <algorithm>
 
 namespace fc
@@ -291,6 +292,9 @@ void  variant::visit( const visitor& v )const
          return;
       case object_type:
          v.handle( **reinterpret_cast<const const_variant_object_ptr*>(this) );
+         return;
+      case blob_type:
+         v.handle( **reinterpret_cast<const const_blob_ptr*>(this) );
          return;
       default:
          FC_THROW_EXCEPTION( assert_exception, "Invalid Type / Corrupted Memory" );
@@ -627,17 +631,7 @@ void from_variant( const variant& var,  int32_t& vo )
 }
 
 void to_variant( const unsigned __int128& var,  variant& vo )  {
-   /*
-   if( var <= static_cast<unsigned __int128>( std::numeric_limits<uint32_t>::max() ) )
-   { // uint32_t rather than uint64_t so that the number can be represented in JavaScript
-      vo = static_cast<uint64_t>(var);
-      return;
-   }
-   */
-   std::string s = "0x";
-   s.append( to_hex( reinterpret_cast<const char*>(&var), sizeof(var) ) );
-   vo = s;
-   // Assumes platform is little endian since it should write out the hex representation of 128-bit integer in little endian order.
+   vo = boost::multiprecision::uint128_t( var ).str();
 }
 
 void from_variant( const variant& var,  unsigned __int128& vo )
@@ -645,32 +639,14 @@ void from_variant( const variant& var,  unsigned __int128& vo )
    if( var.is_uint64() ) {
       vo = var.as_uint64();
    } else if( var.is_string() ) {
-      unsigned __int128 temp = 0;
-      auto s = var.as_string();
-      FC_ASSERT( s.size() == 2 + 2 * sizeof(temp) && s.find("0x") == 0,
-                 "Failure in converting hex data into a uint128_t"      );
-      auto sz = from_hex( s.substr(2), reinterpret_cast<char*>(&temp), sizeof(temp) );
-      // Assumes platform is little endian and hex representation of 128-bit integer is in little endian order.
-      FC_ASSERT( sz == sizeof(temp), "Failure in converting hex data into a uint128_t" );
-      vo = temp;
+      vo = static_cast<unsigned __int128>( boost::multiprecision::uint128_t(var.as_string()) );
    } else {
       FC_THROW_EXCEPTION( bad_cast_exception, "Cannot convert variant of type '${type}' into a uint128_t", ("type", var.get_type()) );
    }
 }
 
 void to_variant( const __int128& var,  variant& vo )  {
-   /*
-   if( static_cast<__int128>( std::numeric_limits<int32_t>::lowest() ) <= var
-       && var <= static_cast<__int128>( std::numeric_limits<int32_t>::max() ) )
-   { // int32_t rather than int64_t so that the number can be represented in JavaScript
-      vo = static_cast<int64_t>(var);
-      return;
-   }
-   */
-   std::string s = "0x";
-   s.append( to_hex( reinterpret_cast<const char*>(&var), sizeof(var) ) );
-   vo = s;
-   // Assumes platform is little endian since it should write out the hex representation of 128-bit integer in little endian order.
+   vo = boost::multiprecision::int128_t( var ).str();
 }
 
 void from_variant( const variant& var,  __int128& vo )
@@ -678,14 +654,7 @@ void from_variant( const variant& var,  __int128& vo )
    if( var.is_int64() ) {
       vo = var.as_int64();
    } else if( var.is_string() ) {
-      __int128 temp = 0;
-      auto s = var.as_string();
-      FC_ASSERT( s.size() == 2 + 2 * sizeof(temp) && s.find("0x") == 0,
-                 "Failure in converting hex data into a int128_t"       );
-      auto sz = from_hex( s.substr(2), reinterpret_cast<char*>(&temp), sizeof(temp) );
-      // Assumes platform is little endian and hex representation of 128-bit integer is in little endian order.
-      FC_ASSERT( sz == sizeof(temp), "Failure in converting hex data into a int128_t" );
-      vo = temp;
+      vo = static_cast<__int128>( boost::multiprecision::int128_t(var.as_string()) );
    } else {
       FC_THROW_EXCEPTION( bad_cast_exception, "Cannot convert variant of type '${type}' into a int128_t", ("type", var.get_type()) );
    }
@@ -718,7 +687,7 @@ void from_variant( const variant& var,  float& vo )
 
 void to_variant( const std::string& s, variant& v )
 {
-    v = variant( fc::string(s) );
+   v = variant( fc::string(s) );
 }
 
 void from_variant( const variant& var,  string& vo )
@@ -728,21 +697,21 @@ void from_variant( const variant& var,  string& vo )
 
 void to_variant( const std::vector<char>& var,  variant& vo )
 {
-  if( var.size() )
+   FC_ASSERT( var.size() <= MAX_SIZE_OF_BYTE_ARRAYS );
+   if( var.size() )
       vo = variant(to_hex(var.data(),var.size()));
-  else vo = "";
+   else vo = "";
 }
 void from_variant( const variant& var,  std::vector<char>& vo )
 {
-     auto str = var.as_string();
-     vo.resize( str.size() / 2 );
-     if( vo.size() )
-     {
-        size_t r = from_hex( str, vo.data(), vo.size() );
-        FC_ASSERT( r == vo.size() );
-     }
-//   std::string b64 = base64_decode( var.as_string() );
-//   vo = std::vector<char>( b64.c_str(), b64.c_str() + b64.size() );
+   const auto& str = var.get_string();
+   FC_ASSERT( str.size() <= 2*MAX_SIZE_OF_BYTE_ARRAYS ); // Doubled because hex strings needs two characters per byte
+   FC_ASSERT( str.size() % 2 == 0, "the length of hex string should be even number" );
+   vo.resize( str.size() / 2 );
+   if( vo.size() ) {
+      size_t r = from_hex( str, vo.data(), vo.size() );
+      FC_ASSERT( r == vo.size() );
+   }
 }
 
 void to_variant( const UInt<8>& n, variant& v ) { v = uint64_t(n); }
@@ -761,21 +730,34 @@ void to_variant( const UInt<64>& n, variant& v ) { v = uint64_t(n); }
 void from_variant( const variant& v, UInt<64>& n ) { n = v.as_uint64(); }
 
 constexpr size_t minimize_max_size = 1024;
-constexpr size_t minimize_sub_max_size = minimize_max_size / 4;
+
+// same behavior as std::string::substr only removes invalid utf8, and lower ascii
+void clean_append( string& app, const std::string_view& s, size_t pos = 0, size_t len = string::npos ) {
+   std::string_view sub = s.substr( pos, len );
+   app.reserve( app.size() + sub.size() );
+   const bool escape_control_chars = false;
+   app += escape_string( sub, nullptr, escape_control_chars );
+}
 
 string format_string( const string& frmt, const variant_object& args, bool minimize )
 {
    std::string result;
    const string& format = ( minimize && frmt.size() > minimize_max_size ) ?
          frmt.substr( 0, minimize_max_size ) + "..." : frmt;
-   result.reserve( minimize_sub_max_size );
+
+   const auto arg_num = (args.size() == 0) ? 1 : args.size();
+   const auto max_format_size = std::max(minimize_max_size, format.size());
+   // limit each arg size when minimize is set
+   const auto minimize_sub_max_size = minimize ? ( max_format_size - format.size() ) / arg_num :  minimize_max_size;
+   // reserve space for each argument replaced by ...
+   result.reserve( max_format_size + 3 * args.size());
    size_t prev = 0;
    size_t next = format.find( '$' );
    while( prev != string::npos && prev < format.size() ) {
       if( next != string::npos ) {
-         result += format.substr( prev, next - prev );
+         clean_append( result, format, prev, next - prev );
       } else {
-         result += format.substr( prev );
+         clean_append( result, format, prev );
       }
 
       // if we got to the end, return it.
@@ -801,34 +783,41 @@ string format_string( const string& frmt, const variant_object& args, bool minim
             bool replaced = true;
             if( val != args.end() ) {
                if( val->value().is_object() || val->value().is_array() ) {
-                  if( minimize ) {
+                  if( minimize && (result.size() >= minimize_max_size)) {
                      replaced = false;
                   } else {
-                     result += json::to_string( val->value() );
+                     const auto max_length = minimize ? minimize_sub_max_size : std::numeric_limits<uint64_t>::max();
+                     try {
+                        // clean_append not needed as to_string is valid utf8
+                        result += json::to_string( val->value(), fc::time_point::maximum(),
+                                                   json::output_formatting::stringify_large_ints_and_doubles, max_length );
+                     } catch (...) {
+                        replaced = false;
+                     }
                   }
                } else if( val->value().is_blob() ) {
                   if( minimize && val->value().get_blob().data.size() > minimize_sub_max_size ) {
                      replaced = false;
                   } else {
-                     result += val->value().as_string();
+                     clean_append( result, val->value().as_string() );
                   }
                } else if( val->value().is_string() ) {
                   if( minimize && val->value().get_string().size() > minimize_sub_max_size ) {
                      auto sz = std::min( minimize_sub_max_size, minimize_max_size - result.size() );
-                     result += val->value().get_string().substr( 0, sz );
+                     clean_append( result, val->value().get_string(), 0, sz );
                      result += "...";
                   } else {
-                     result += val->value().get_string();
+                     clean_append( result, val->value().get_string() );
                   }
                } else {
-                  result += val->value().as_string();
+                  clean_append( result, val->value().as_string() );
                }
             } else {
                replaced = false;
             }
             if( !replaced ) {
                result += "${";
-               result += key;
+               clean_append( result, key );
                result += "}";
             }
             prev = next + 1;
@@ -838,7 +827,7 @@ string format_string( const string& frmt, const variant_object& args, bool minim
             // we didn't find it.. continue to while...
          }
       } else {
-         result += format[prev];
+         clean_append( result, format, prev, 1 );
          ++prev;
          next = format.find( '$', prev );
       }

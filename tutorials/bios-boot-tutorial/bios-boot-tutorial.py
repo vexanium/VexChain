@@ -14,8 +14,7 @@ args = None
 logFile = None
 
 unlockTimeout = 999999999
-fastUnstakeSystem = '../../eosio.contracts/build/contracts/eosio.systemnew/eosio.system.wasm'
-#fastUnstakeSystem = './replace.json'
+fastUnstakeSystem = './fast.refund/eosio.system/eosio.system.wasm'
 
 systemAccounts = [
     'vex.bpay',
@@ -42,7 +41,7 @@ def run(args):
 
 def retry(args):
     while True:
-        print('bios-boot-tutorial.py:', args)
+        print('bios-boot-tutorial.py: ', args)
         logFile.write(args + '\n')
         if subprocess.call(args, shell=True):
             print('*** Retry')
@@ -73,7 +72,7 @@ def startWallet():
     run('mkdir -p ' + os.path.abspath(args.wallet_dir))
     background(args.keosd + ' --unlock-timeout %d --http-server-address 127.0.0.1:6666 --wallet-dir %s' % (unlockTimeout, os.path.abspath(args.wallet_dir)))
     sleep(.4)
-    run(args.cleos + 'wallet create -f password.txt')#--to-console
+    run(args.cleos + 'wallet create --to-console')
 
 def importKeys():
     run(args.cleos + 'wallet import --private-key ' + args.private_key)
@@ -104,6 +103,10 @@ def startNode(nodeIndex, account):
     cmd = (
         args.nodeos +
         '    --max-irreversible-block-age -1'
+        # max-transaction-time must be less than block time
+        # (which is defined in .../chain/include/eosio/chain/config.hpp
+        # as block_interval_ms = 500)
+        '    --max-transaction-time=200'
         '    --contracts-console'
         '    --genesis-json ' + os.path.abspath(args.genesis) +
         '    --blocks-dir ' + os.path.abspath(dir) + '/blocks'
@@ -119,96 +122,38 @@ def startNode(nodeIndex, account):
         '    --private-key \'["' + account['pub'] + '","' + account['pvt'] + '"]\''
         '    --plugin eosio::http_plugin'
         '    --plugin eosio::chain_api_plugin'
+        '    --plugin eosio::chain_plugin'
+        '    --plugin eosio::producer_api_plugin'
         '    --plugin eosio::producer_plugin' +
         otherOpts)
     with open(dir + 'stderr', mode='w') as f:
         f.write(cmd + '\n\n')
     background(cmd + '    2>>' + dir + 'stderr')
 
-def startOneNode(nodeIndex, account):
-    dir = args.nodes_dir + ('%02d-' % nodeIndex) + account['name'] + '/'
-    run('rm -rf ' + dir)
-    run('mkdir -p ' + dir)
-    otherOpts = ''.join(list(map(lambda i: '    --p2p-peer-address localhost:' + str(9000 + i), range(nodeIndex)))) 
-    # if not nodeIndex: otherOpts += (
-    #     '    --plugin eosio::history_plugin'
-    #     '    --plugin eosio::history_api_plugin'
-    # )
-
-    bpnames = ''
-    bpsigpros = ''
-    for i in range(0, numProducers):
-        bpaccount = bpaccounts[i]
-        bpnames =  bpnames + bpaccount['name'] + '  '
-        bpsigpros = bpsigpros + bpaccount['pub'] + '=KEY:' + bpaccount['pvt'] + '  '  
-    # print('bpaccounts ', bpnames)
-    # print('bpsigpros ', bpsigpros)
-    
-    cmd = (
-        args.nodeos +
-        '    --max-irreversible-block-age -1'
-        '    --contracts-console'
-        '    --genesis-json ' + os.path.abspath(args.genesis) +
-        '    --blocks-dir ' + os.path.abspath(dir) + '/blocks'
-        '    --config-dir ' + os.path.abspath(dir) +
-        '    --data-dir ' + os.path.abspath(dir) +
-        '    --chain-state-db-size-mb 1024'
-        '    --http-server-address 127.0.0.1:' + str(8000 + nodeIndex) +
-        '    --p2p-listen-endpoint 127.0.0.1:' + str(9000 + nodeIndex) +
-        '    --max-clients ' + str(maxClients) +
-        '    --p2p-max-nodes-per-host ' + str(maxClients) +
-        '    --enable-stale-production'
-        '    --producer-name ' + "".join('%s' %id for id in bpnames) +
-        '    --signature-provider=' + "".join('%s' %id for id in bpsigpros) +
-        '    --plugin eosio::http_plugin'
-        '    --plugin eosio::chain_api_plugin'
-        '    --plugin eosio::producer_plugin' +
-        otherOpts)
-    with open(dir + 'stderr', mode='w') as f:
-        f.write(cmd + '\n\n')
-    background(cmd + '    2>>' + dir + 'stderr')	
-
 def startProducers(b, e):
-    # for i in range(b, e):
-    #     startNode(i - b + 1, accounts[i])
-    for i in range(0, 1):
-        startOneNode(i + 1, bpaccounts[i])
-
+    for i in range(b, e):
+        startNode(i - b + 1, accounts[i])
 
 def createSystemAccounts():
     for a in systemAccounts:
-        run(args.cleos + 'create account vexcore ' + a + ' ' + args.public_key)
-        #sleep(1.0)
+        run(args.cleos + 'create account vexcore' + a + ' ' + args.public_key)
 
 def intToCurrency(i):
     return '%d.%04d %s' % (i // 10000, i % 10000, args.symbol)
 
 def allocateFunds(b, e):
-    # dist = numpy.random.pareto(1.161, e - b).tolist() # 1.161 = 80/20 rule
-    # dist.sort()
-    # dist.reverse()
-    # factor = 1_000_000_000 / sum(dist)
-    # total = 0
-    # for i in range(b, e):
-    #     funds = round(factor * dist[i - b] * 10000)
-    #     if i >= firstProducer and i < firstProducer + numProducers:
-    #         funds = max(funds, round(args.min_producer_funds * 10000))
-    #     total += funds
-    #     accounts[i]['funds'] = funds
-    # return total
-     for i in range(b, e):
-        funds = 0
-        if i == 0:
-            funds = round(300000000.0000 * 10000) #3亿
-        if i == 1:
-            funds = round((700000000.0000 - (30 * 100000.0000 ))* 10000) #7亿 - 300万
+    dist = numpy.random.pareto(1.161, e - b).tolist() # 1.161 = 80/20 rule
+    dist.sort()
+    dist.reverse()
+    factor = 1_000_000_000 / sum(dist)
+    total = 0
+    for i in range(b, e):
+        funds = round(factor * dist[i - b] * 10000)
         if i >= firstProducer and i < firstProducer + numProducers:
-            funds = round(100000.0000 * 10000) #10万 
-        a = accounts[i]        
-        a['funds'] = funds
-        print('#' * 80)
-        print('# %d/%d %s %s' % (i, e, a['name'], intToCurrency(funds)))
-        print('#' * 80)   
+            funds = max(funds, round(args.min_producer_funds * 10000))
+        total += funds
+        accounts[i]['funds'] = funds
+    return total
 
 def createStakedAccounts(b, e):
     ramFunds = round(args.ram_funds * 10000)
@@ -228,10 +173,6 @@ def createStakedAccounts(b, e):
         stake = funds - ramFunds - unstaked
         stakeNet = round(stake / 2)
         stakeCpu = stake - stakeNet
-        if i == 1:
-            stakeNet = ramFunds
-            stakeCpu = ramFunds
-            unstaked = funds - ramFunds - stakeNet - stakeCpu
         print('%s: total funds=%s, ram=%s, net=%s, cpu=%s, unstaked=%s' % (a['name'], intToCurrency(a['funds']), intToCurrency(ramFunds), intToCurrency(stakeNet), intToCurrency(stakeCpu), intToCurrency(unstaked)))
         assert(funds == ramFunds + stakeNet + stakeCpu + unstaked)
         retry(args.cleos + 'system newaccount --transfer vexcore %s %s --stake-net "%s" --stake-cpu "%s" --buy-ram "%s"   ' % 
@@ -242,8 +183,7 @@ def createStakedAccounts(b, e):
 def regProducers(b, e):
     for i in range(b, e):
         a = accounts[i]
-        #retry(args.cleos + 'system regproducer ' + a['name'] + ' ' + a['pub'] + ' https://' + a['name'] + '.com' + '/' + a['pub'])
-        retry(args.cleos + 'system regproducer ' + a['name'] + ' ' + a['pub'] + ' https://' + a['name'] + '.com' + '/')
+        retry(args.cleos + 'system regproducer ' + a['name'] + ' ' + a['pub'] + ' https://' + a['name'] + '.com' + '/' + a['pub'])
 
 def listProducers():
     run(args.cleos + 'system listproducers')
@@ -251,15 +191,12 @@ def listProducers():
 def vote(b, e):
     for i in range(b, e):
         voter = accounts[i]['name']
-        if i == 1:
-            continue
         k = args.num_producers_vote
         if k > numProducers:
             k = numProducers - 1
         prods = random.sample(range(firstProducer, firstProducer + numProducers), k)
         prods = ' '.join(map(lambda x: accounts[x]['name'], prods))
         retry(args.cleos + 'system voteproducer prods ' + voter + ' ' + prods)
-        #sleep(1.0)
 
 def claimRewards():
     table = getJsonOutput(args.cleos + 'get table vexcore vexcore producers -l 100')
@@ -277,7 +214,6 @@ def proxyVotes(b, e):
     for i in range(b, e):
         voter = accounts[i]['name']
         retry(args.cleos + 'system voteproducer proxy ' + voter + ' ' + proxy)
-        #sleep(1.0)
 
 def updateAuth(account, permission, parent, controller):
     run(args.cleos + 'push action vexcore updateauth' + jsonArg({
@@ -311,13 +247,11 @@ def msigProposeReplaceSystem(proposer, proposalName):
     requestedPermissions = []
     for i in range(firstProducer, firstProducer + numProducers):
         requestedPermissions.append({'actor': accounts[i]['name'], 'permission': 'active'})
-    trxPermissions = [{'actor': 'vexcore', 'permission': 'active'}]
+    trxPermissions = [{'actor': 'eosio', 'permission': 'active'}]
     with open(fastUnstakeSystem, mode='rb') as f:
-        setcode = {'account': 'vexcore', 'vmtype': 0, 'vmversion': 0, 'code': f.read().hex()}
+        setcode = {'account': 'eosio', 'vmtype': 0, 'vmversion': 0, 'code': f.read().hex()}
     run(args.cleos + 'multisig propose ' + proposalName + jsonArg(requestedPermissions) + 
-        # jsonArg(trxPermissions) + 'set contract vexcore ' + args.contracts_dir + '/eosio.systemnew/' + ' -p ' + proposer)
         jsonArg(trxPermissions) + 'vexcore setcode' + jsonArg(setcode) + ' -p ' + proposer)
-        # jsonArg(trxPermissions) + 'vexcore setcode ' + fastUnstakeSystem + ' -p ' + proposer)
 
 def msigApproveReplaceSystem(proposer, proposalName):
     for i in range(firstProducer, firstProducer + numProducers):
@@ -329,26 +263,16 @@ def msigExecReplaceSystem(proposer, proposalName):
     retry(args.cleos + 'multisig exec ' + proposer + ' ' + proposalName + ' -p ' + proposer)
 
 def msigReplaceSystem():
-    # run(args.cleos + 'push action vex.token issue \'["vexcore", "10000000.0000 VEX", "memo"]\' -p vexcore' )
-    # sleep(1)
-    # #run(args.cleos + 'push action vexcore buyrambytes' + jsonArg(['vexcore', 'vexcore', 10000000]) + '-p vexcore')
-    # # sleep(1)
-    # run(args.cleos + 'push action vex.token transfer \'["vexcore","vexstake" "10000000.0000 VEX", "memo"]\' -p vexcore')
-    # sleep(1)
-    # run(args.cleos + 'push action vexcore buyrambytes' + jsonArg(['vexstake', accounts[0]['name'], 300000]) + '-p vexstake')
-    # sleep(1)
-    # # run(args.cleos + ' system delegatebw vexstake vexstake \"5000.0000 VEX\" \"5000.0000 VEX\" -p vexstake')
-    # # sleep(1)
-    # run(args.cleos + ' system delegatebw vexstake vexstake \"500.0000 VEX\" \"500000.0000 VEX\" -p vexstake')
-    # sleep(1)
-    msigProposeReplaceSystem(accounts[0]['name'], 'vote1bp')
+    run(args.cleos + 'push action vexcore buyrambytes' + jsonArg(['eosio', accounts[0]['name'], 200000]) + '-p eosio')
     sleep(1)
-    msigApproveReplaceSystem(accounts[0]['name'], 'vote1bp')
-    msigExecReplaceSystem(accounts[0]['name'], 'vote1bp')
+    msigProposeReplaceSystem(accounts[0]['name'], 'fast.unstake')
+    sleep(1)
+    msigApproveReplaceSystem(accounts[0]['name'], 'fast.unstake')
+    msigExecReplaceSystem(accounts[0]['name'], 'fast.unstake')
 
 def produceNewAccounts():
     with open('newusers', 'w') as f:
-        for i in range(120000, 200000):
+        for i in range(120_000, 200_000):
             x = getOutput(args.cleos + 'create key --to-console')
             r = re.match('Private key: *([^ \n]*)\nPublic key: *([^ \n]*)', x, re.DOTALL | re.MULTILINE)
             name = 'user'
@@ -359,56 +283,108 @@ def produceNewAccounts():
 
 def stepKillAll():
     run('killall keosd nodeos || true')
-    sleep(2.5)
+    sleep(1.5)
 def stepStartWallet():
     startWallet()
     importKeys()
 def stepStartBoot():
-    startNode(0, {'name': 'vexcore', 'pvt': args.private_key, 'pub': args.public_key})
-    sleep(5)
+    startNode(0, {'name': 'eosio', 'pvt': args.private_key, 'pub': args.public_key})
+    sleep(10.0)
 def stepInstallSystemContracts():
-    run(args.cleos + 'set contract vex.token ' + args.contracts_dir + '/eosio.token/')
-    run(args.cleos + 'set contract vex.msig ' + args.contracts_dir + '/eosio.msig/')
-    sleep(5)
+    run(args.cleos + 'set contract vex.token ' + args.contracts_dir + '/vex.token/')
+    run(args.cleos + 'set contract vex.msig ' + args.contracts_dir + '/vex.msig/')
 def stepCreateTokens():
     run(args.cleos + 'push action vex.token create \'["vexcore", "10000000000.0000 %s"]\' -p vex.token' % (args.symbol))
-    run(args.cleos + 'push action vex.token issue \'["vexcore", "1000000000.0000 %s", "issue all to vexcore"]\' -p vexcore' % (args.symbol))
-    allocateFunds(0, len(accounts))    
-    # totalAllocation = allocateFunds(0, len(accounts))
-    # run(args.cleos + 'push action vex.token issue \'["vexcore", "%s", "memo"]\' -p vexcore' % intToCurrency(totalAllocation))
-    sleep(2)
+    totalAllocation = allocateFunds(0, len(accounts))
+    run(args.cleos + 'push action vex.token issue \'["vexcore", "%s", "memo"]\' -p eosio' % intToCurrency(totalAllocation))
+    sleep(1)
 def stepSetSystemContract():
-    retry(args.cleos + 'set contract vexcore ' + args.contracts_dir + '/eosio.system/')
-    sleep(2)
-    run(args.cleos + 'push action vexcore setpriv' + jsonArg(['vex.msig', 1]) + '-p vexcore@active')
+    # All of the protocol upgrade features introduced in v1.8 first require a special protocol 
+    # feature (codename PREACTIVATE_FEATURE) to be activated and for an updated version of the system 
+    # contract that makes use of the functionality introduced by that feature to be deployed. 
+
+    # activate PREACTIVATE_FEATURE before installing eosio.boot
+    retry('curl -X POST http://127.0.0.1:%d' % args.http_port + 
+        '/v1/producer/schedule_protocol_feature_activations ' +
+        '-d \'{"protocol_features_to_activate": ["0ec7e080177b2c02b278d5088611686b49d739925a92d9bfcacd7fc6b74053bd"]}\'')
+    sleep(3)
+
+    # install eosio.boot which supports the native actions and activate 
+    # action that allows activating desired protocol features prior to 
+    # deploying a system contract with more features such as eosio.bios 
+    # or eosio.system
+    retry(args.cleos + 'set contract vexcore' + args.contracts_dir + '/eosio.boot/')
+    sleep(3)
+
+    # activate remaining features
+    # KV_DATABASE
+    retry(args.cleos + 'push action vexcore activate \'["825ee6288fb1373eab1b5187ec2f04f6eacb39cb3a97f356a07c91622dd61d16"]\' -p eosio@active')
+    # ACTION_RETURN_VALUE
+    retry(args.cleos + 'push action vexcore activate \'["c3a6138c5061cf291310887c0b5c71fcaffeab90d5deb50d3b9e687cead45071"]\' -p eosio@active')
+    # CONFIGURABLE_WASM_LIMITS
+    retry(args.cleos + 'push action vexcore activate \'["bf61537fd21c61a60e542a5d66c3f6a78da0589336868307f94a82bccea84e88"]\' -p eosio@active')
+    # BLOCKCHAIN_PARAMETERS
+    retry(args.cleos + 'push action vexcore activate \'["5443fcf88330c586bc0e5f3dee10e7f63c76c00249c87fe4fbf7f38c082006b4"]\' -p eosio@active')
+    # GET_SENDER
+    retry(args.cleos + 'push action vexcore activate \'["f0af56d2c5a48d60a4a5b5c903edfb7db3a736a94ed589d0b797df33ff9d3e1d"]\' -p eosio@active')
+    # FORWARD_SETCODE
+    retry(args.cleos + 'push action vexcore activate \'["2652f5f96006294109b3dd0bbde63693f55324af452b799ee137a81a905eed25"]\' -p eosio@active')
+    # ONLY_BILL_FIRST_AUTHORIZER
+    retry(args.cleos + 'push action vexcore activate \'["8ba52fe7a3956c5cd3a656a3174b931d3bb2abb45578befc59f283ecd816a405"]\' -p eosio@active')
+    # RESTRICT_ACTION_TO_SELF
+    retry(args.cleos + 'push action vexcore activate \'["ad9e3d8f650687709fd68f4b90b41f7d825a365b02c23a636cef88ac2ac00c43"]\' -p eosio@active')
+    # DISALLOW_EMPTY_PRODUCER_SCHEDULE
+    retry(args.cleos + 'push action vexcore activate \'["68dcaa34c0517d19666e6b33add67351d8c5f69e999ca1e37931bc410a297428"]\' -p eosio@active')
+     # FIX_LINKAUTH_RESTRICTION
+    retry(args.cleos + 'push action vexcore activate \'["e0fb64b1085cc5538970158d05a009c24e276fb94e1a0bf6a528b48fbc4ff526"]\' -p eosio@active')
+     # REPLACE_DEFERRED
+    retry(args.cleos + 'push action vexcore activate \'["ef43112c6543b88db2283a2e077278c315ae2c84719a8b25f25cc88565fbea99"]\' -p eosio@active')
+    # NO_DUPLICATE_DEFERRED_ID
+    retry(args.cleos + 'push action vexcore activate \'["4a90c00d55454dc5b059055ca213579c6ea856967712a56017487886a4d4cc0f"]\' -p eosio@active')
+    # ONLY_LINK_TO_EXISTING_PERMISSION
+    retry(args.cleos + 'push action vexcore activate \'["1a99a59d87e06e09ec5b028a9cbb7749b4a5ad8819004365d02dc4379a8b7241"]\' -p eosio@active')
+    # RAM_RESTRICTIONS
+    retry(args.cleos + 'push action vexcore activate \'["4e7bf348da00a945489b2a681749eb56f5de00b900014e137ddae39f48f69d67"]\' -p eosio@active')
+    # WEBAUTHN_KEY
+    retry(args.cleos + 'push action vexcore activate \'["4fca8bd82bbd181e714e283f83e1b45d95ca5af40fb89ad3977b653c448f78c2"]\' -p eosio@active')
+    # WTMSIG_BLOCK_SIGNATURES
+    retry(args.cleos + 'push action vexcore activate \'["299dcb6af692324b899b39f16d5a530a33062804e41f09dc97e9f156b4476707"]\' -p eosio@active')
+    sleep(1)
+
+    # install eosio.system latest version
+    retry(args.cleos + 'set contract vexcore' + args.contracts_dir + '/eosio.system/')
+    # setpriv is only available after eosio.system is installed
+    run(args.cleos + 'push action vexcore setpriv' + jsonArg(['vex.msig', 1]) + '-p eosio@active')
+    sleep(3)
+
 def stepInitSystemContract():
-    run(args.cleos + 'push action vexcore init' + jsonArg(['0', '4,VEX']) + '-p vexcore@active')
-    sleep(2)
+    run(args.cleos + 'push action vexcore init' + jsonArg(['0', '4,' + args.symbol]) + '-p eosio@active')
+    sleep(1)
 def stepCreateStakedAccounts():
     createStakedAccounts(0, len(accounts))
 def stepRegProducers():
     regProducers(firstProducer, firstProducer + numProducers)
-    sleep(2)
+    sleep(1)
     listProducers()
 def stepStartProducers():
     startProducers(firstProducer, firstProducer + numProducers)
     sleep(args.producer_sync_delay)
 def stepVote():
     vote(0, 0 + args.num_voters)
-    sleep(2)
+    sleep(1)
     listProducers()
     sleep(5)
 def stepProxyVotes():
     proxyVotes(0, 0 + args.num_voters)
 def stepResign():
-    resign('vexcore', 'vex.prods')
+    resign('eosio', 'vex.prods')
     for a in systemAccounts:
-        resign(a, 'vexcore')
+        resign(a, 'eosio')
 def stepTransfer():
     while True:
         randomTransfer(0, args.num_senders)
 def stepLog():
-    run('tail -n 60 ' + args.nodes_dir + '00-vexcore/stderr')
+    run('tail -n 60 ' + args.nodes_dir + '00-eosio/stderr')
 
 # Command Line Arguments
 
@@ -418,7 +394,7 @@ commands = [
     ('k', 'kill',               stepKillAll,                True,    "Kill all nodeos and keosd processes"),
     ('w', 'wallet',             stepStartWallet,            True,    "Start keosd, create wallet, fill with keys"),
     ('b', 'boot',               stepStartBoot,              True,    "Start boot node"),
-    ('s', 'sys',                createSystemAccounts,       True,    "Create system accounts (vex.*)"),
+    ('s', 'sys',                createSystemAccounts,       True,    "Create system accounts (eosio.*)"),
     ('c', 'contracts',          stepInstallSystemContracts, True,    "Install system contracts (token, msig)"),
     ('t', 'tokens',             stepCreateTokens,           True,    "Create tokens"),
     ('S', 'sys-contract',       stepSetSystemContract,      True,    "Set system contract"),
@@ -428,35 +404,35 @@ commands = [
     ('P', 'start-prod',         stepStartProducers,         True,    "Start producers"),
     ('v', 'vote',               stepVote,                   True,    "Vote for producers"),
     ('R', 'claim',              claimRewards,               True,    "Claim rewards"),
-    ('x', 'proxy',              stepProxyVotes,             False,   "Proxy votes"),
-    ('q', 'resign',             stepResign,                 True,    "Resign vexcore"),
+    ('x', 'proxy',              stepProxyVotes,             True,    "Proxy votes"),
+    ('q', 'resign',             stepResign,                 True,    "Resign eosio"),
     ('m', 'msg-replace',        msigReplaceSystem,          False,   "Replace system contract using msig"),
     ('X', 'xfer',               stepTransfer,               False,   "Random transfer tokens (infinite loop)"),
     ('l', 'log',                stepLog,                    True,    "Show tail of node's log"),
 ]
 
-parser.add_argument('--public-key', metavar='', help="VEXANIUM Public Key", default='VEX6LjFWJ6tfka3JAmsBttx1JdGznvkJ54h1oMWzAZEKnMUBWwv5Y', dest="public_key")
-parser.add_argument('--private-Key', metavar='', help="VEXANIUM Private Key", default='5J4QZGBohrszShC2QEkhQXkiFG2oqRNd2XPUoGPDPS7qyXkX8hd', dest="private_key")
+parser.add_argument('--public-key', metavar='', help="VEXANIUM Public Key", default='EOS8Znrtgwt8TfpmbVpTKvA2oB8Nqey625CLN8bCN3TEbgx86Dsvr', dest="public_key")
+parser.add_argument('--private-Key', metavar='', help="VEXANIUM Private Key", default='5K463ynhZoCDDa4RDcr63cUwWLTnKqmdcoTKTHBjqoKfv4u5V7p', dest="private_key")
 parser.add_argument('--cleos', metavar='', help="Cleos command", default='../../build/programs/cleos/cleos --wallet-url http://127.0.0.1:6666 ')
 parser.add_argument('--nodeos', metavar='', help="Path to nodeos binary", default='../../build/programs/nodeos/nodeos')
 parser.add_argument('--keosd', metavar='', help="Path to keosd binary", default='../../build/programs/keosd/keosd')
-parser.add_argument('--contracts-dir', metavar='', help="Path to contracts directory", default='../../eosio.contracts/build/contracts')
+parser.add_argument('--contracts-dir', metavar='', help="Path to contracts directory", default='../../build/contracts/')
 parser.add_argument('--nodes-dir', metavar='', help="Path to nodes directory", default='./nodes/')
 parser.add_argument('--genesis', metavar='', help="Path to genesis.json", default="./genesis.json")
 parser.add_argument('--wallet-dir', metavar='', help="Path to wallet directory", default='./wallet/')
 parser.add_argument('--log-path', metavar='', help="Path to log file", default='./output.log')
-parser.add_argument('--symbol', metavar='', help="The vex.system symbol", default='VEX')
+parser.add_argument('--symbol', metavar='', help="The eosio.system symbol", default='VEX')
 parser.add_argument('--user-limit', metavar='', help="Max number of users. (0 = no limit)", type=int, default=3000)
 parser.add_argument('--max-user-keys', metavar='', help="Maximum user keys to import into wallet", type=int, default=10)
-parser.add_argument('--ram-funds', metavar='', help="How much funds for each user to spend on ram", type=float, default=10.0)
-parser.add_argument('--min-stake', metavar='', help="Minimum stake before allocating unstaked funds", type=float, default=10.0)
+parser.add_argument('--ram-funds', metavar='', help="How much funds for each user to spend on ram", type=float, default=0.1)
+parser.add_argument('--min-stake', metavar='', help="Minimum stake before allocating unstaked funds", type=float, default=0.9)
 parser.add_argument('--max-unstaked', metavar='', help="Maximum unstaked funds", type=float, default=10)
 parser.add_argument('--producer-limit', metavar='', help="Maximum number of producers. (0 = no limit)", type=int, default=0)
 parser.add_argument('--min-producer-funds', metavar='', help="Minimum producer funds", type=float, default=1000.0000)
 parser.add_argument('--num-producers-vote', metavar='', help="Number of producers for which each user votes", type=int, default=20)
 parser.add_argument('--num-voters', metavar='', help="Number of voters", type=int, default=10)
 parser.add_argument('--num-senders', metavar='', help="Number of users to transfer funds randomly", type=int, default=10)
-parser.add_argument('--producer-sync-delay', metavar='', help="Time (s) to sleep to allow producers to sync", type=int, default=20)
+parser.add_argument('--producer-sync-delay', metavar='', help="Time (s) to sleep to allow producers to sync", type=int, default=80)
 parser.add_argument('-a', '--all', action='store_true', help="Do everything marked with (*)")
 parser.add_argument('-H', '--http-port', type=int, default=8000, metavar='', help='HTTP port for cleos')
 
@@ -471,7 +447,8 @@ for (flag, command, function, inAll, help) in commands:
         
 args = parser.parse_args()
 
-args.cleos += '--url http://127.0.0.1:%d ' % args.http_port
+# Leave a space in front of --url in case the user types cleos alone
+args.cleos += ' --url http://127.0.0.1:%d ' % args.http_port
 
 logFile = open(args.log_path, 'a')
 
@@ -485,8 +462,7 @@ with open('accounts.json') as f:
         del a['producers'][args.producer_limit:]
     firstProducer = len(a['users'])
     numProducers = len(a['producers'])
-    accounts = a['users'] + a['producers']#user 在前 bp在后
-    bpaccounts = a['producers']
+    accounts = a['users'] + a['producers']
 
 maxClients = numProducers + 10
 

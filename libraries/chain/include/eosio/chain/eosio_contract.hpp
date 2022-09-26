@@ -1,7 +1,3 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE
- */
 #pragma once
 
 #include <eosio/chain/types.hpp>
@@ -22,9 +18,9 @@ namespace eosio { namespace chain {
    void apply_vexcore_unlinkauth(apply_context&);
 
    /*
-   void apply_eosio_postrecovery(apply_context&);
-   void apply_eosio_passrecovery(apply_context&);
-   void apply_eosio_vetorecovery(apply_context&);
+   void apply_vexcore_postrecovery(apply_context&);
+   void apply_vexcore_passrecovery(apply_context&);
+   void apply_vexcore_vetorecovery(apply_context&);
    */
 
    void apply_vexcore_setcode(apply_context&);

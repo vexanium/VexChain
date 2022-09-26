@@ -26,6 +26,7 @@ class application_impl {
       }
       options_description     _app_options;
       options_description     _cfg_options;
+      variables_map           _options;
 
       bfs::path               _data_dir{"data-dir"};
       bfs::path               _config_dir{"config-dir"};
@@ -33,6 +34,8 @@ class application_impl {
       bfs::path               _config_file_name;
 
       uint64_t                _version = 0;
+      std::string             _version_str = appbase_version_string;
+      std::string             _full_version_str = appbase_version_string;
 
       std::atomic_bool        _is_quiting{false};
 
@@ -69,7 +72,19 @@ uint64_t application::version() const {
 }
 
 string application::version_string() const {
-   return appbase_version_string;
+   return my->_version_str;
+}
+
+void application::set_version_string( std::string v ) {
+   my->_version_str = std::move( v );
+}
+
+string application::full_version_string() const {
+   return my->_full_version_str;
+}
+
+void application::set_full_version_string( std::string v ) {
+   my->_full_version_str = std::move( v );
 }
 
 void application::set_default_data_dir(const bfs::path& data_dir) {
@@ -93,15 +108,23 @@ void application::wait_for_signal(std::shared_ptr<boost::asio::signal_set> ss) {
    });
 }
 
-void application::setup_signal_handling_on_ios(boost::asio::io_service& ios) {
-   std::shared_ptr<boost::asio::signal_set> ss = std::make_shared<boost::asio::signal_set>(ios, SIGINT, SIGTERM, SIGPIPE);
+void application::setup_signal_handling_on_ios(boost::asio::io_service& ios, bool startup) {
+   std::shared_ptr<boost::asio::signal_set> ss = std::make_shared<boost::asio::signal_set>(ios, SIGINT, SIGTERM);
+#ifdef SIGPIPE
+   ss->add(SIGPIPE);
+#endif
+#ifdef SIGHUP
+   if( startup ) {
+      ss->add(SIGHUP);
+   }
+#endif
    wait_for_signal(ss);
 }
 
 void application::startup() {
-   //during startup, run a second thread to catch SIGINT/SIGTERM/SIGPIPE
+   //during startup, run a second thread to catch SIGINT/SIGTERM/SIGPIPE/SIGHUP
    boost::asio::io_service startup_thread_ios;
-   setup_signal_handling_on_ios(startup_thread_ios);
+   setup_signal_handling_on_ios(startup_thread_ios, true);
    std::thread startup_thread([&startup_thread_ios]() {
       startup_thread_ios.run();
    });
@@ -124,23 +147,28 @@ void application::startup() {
 
    //after startup, shut down the signal handling thread and catch the signals back on main io_service
    clean_up_signal_thread();
-   setup_signal_handling_on_ios(get_io_service());
+   setup_signal_handling_on_ios(get_io_service(), false);
+
+#ifdef SIGHUP
+   std::shared_ptr<boost::asio::signal_set> sighup_set(new boost::asio::signal_set(get_io_service(), SIGHUP));
+   start_sighup_handler( sighup_set );
+#endif
 }
 
-void application::start_sighup_handler() {
-   std::shared_ptr<boost::asio::signal_set> sighup_set(new boost::asio::signal_set(*io_serv, SIGHUP));
+void application::start_sighup_handler( std::shared_ptr<boost::asio::signal_set> sighup_set ) {
+#ifdef SIGHUP
    sighup_set->async_wait([sighup_set, this](const boost::system::error_code& err, int /*num*/) {
-      app().post(priority::low, [err, this]() {
-         if(!err) {
-            sighup_callback();
-            for( auto plugin : initialized_plugins ) {
-               if( is_quiting() ) return;
-               plugin->handle_sighup();
-            }
-            start_sighup_handler();
+      if( err ) return;
+      app().post(priority::medium, [sighup_set, this]() {
+         sighup_callback();
+         for( auto plugin : initialized_plugins ) {
+            if( is_quiting() ) return;
+            plugin->handle_sighup();
          }
       });
+      start_sighup_handler( sighup_set );
    });
+#endif
 }
 
 application& application::instance() {
@@ -175,6 +203,7 @@ void application::set_program_options()
    app_cli_opts.add_options()
          ("help,h", "Print this help message and exit.")
          ("version,v", "Print version information.")
+         ("full-version", "Print full version information.")
          ("print-default-config", "Print default configuration template")
          ("data-dir,d", bpo::value<std::string>(), "Directory containing program runtime data")
          ("config-dir", bpo::value<std::string>(), "Directory containing configuration files such as config.ini")
@@ -189,8 +218,16 @@ void application::set_program_options()
 bool application::initialize_impl(int argc, char** argv, vector<abstract_plugin*> autostart_plugins) {
    set_program_options();
 
-   bpo::variables_map options;
-   bpo::store(bpo::parse_command_line(argc, argv, my->_app_options), options);
+   bpo::variables_map& options = my->_options;
+   try {
+      bpo::parsed_options parsed = bpo::command_line_parser(argc, argv).options(my->_app_options).run();
+      bpo::store(parsed, options);
+      vector<string> positionals = bpo::collect_unrecognized(parsed.options, bpo::include_positional);
+      if(!positionals.empty())
+         BOOST_THROW_EXCEPTION(std::runtime_error("Unknown option '" + positionals[0] + "' passed as command line argument"));
+   } catch( const boost::program_options::unknown_option& e ) {
+      BOOST_THROW_EXCEPTION(std::runtime_error("Unknown option '" + e.get_option_name() + "' passed as command line argument"));
+   }
 
    if( options.count( "help" ) ) {
       cout << my->_app_options << std::endl;
@@ -199,6 +236,11 @@ bool application::initialize_impl(int argc, char** argv, vector<abstract_plugin*
 
    if( options.count( "version" ) ) {
       cout << version_string() << std::endl;
+      return false;
+   }
+
+   if( options.count( "full-version" ) ) {
+      cout << full_version_string() << std::endl;
       return false;
    }
 
@@ -247,8 +289,14 @@ bool application::initialize_impl(int argc, char** argv, vector<abstract_plugin*
       write_default_config(my->_config_file_name);
    }
 
-   bpo::parsed_options opts_from_config = bpo::parse_config_file<char>(my->_config_file_name.make_preferred().string().c_str(), my->_cfg_options, false);
-   bpo::store(opts_from_config, options);
+   std::vector< bpo::basic_option<char> > opts_from_config;
+   try {
+      bpo::parsed_options parsed_opts_from_config = bpo::parse_config_file<char>(my->_config_file_name.make_preferred().string().c_str(), my->_cfg_options, false);
+      bpo::store(parsed_opts_from_config, options);
+      opts_from_config = parsed_opts_from_config.options;
+   } catch( const boost::program_options::unknown_option& e ) {
+      BOOST_THROW_EXCEPTION(std::runtime_error("Unknown option '" + e.get_option_name() + "' inside the config file " +  full_config_file_path().string()));
+   }
 
    std::vector<string> set_but_default_list;
 
@@ -263,7 +311,7 @@ bool application::initialize_impl(int argc, char** argv, vector<abstract_plugin*
          return false;
       }
 
-      for(const bpo::basic_option<char>& opt : opts_from_config.options) {
+      for(const bpo::basic_option<char>& opt : opts_from_config) {
          if(opt.string_key != od_ptr->long_name())
             continue;
 
@@ -292,6 +340,13 @@ bool application::initialize_impl(int argc, char** argv, vector<abstract_plugin*
       std::cerr << "         removing these items." << std::endl;
    }
 
+   try {
+      bpo::notify(options);
+   } catch(...) {
+      std::cerr << "APPBASE: Failed to notify plugins of options\n";
+      throw;
+   }
+
    if(options.count("plugin") > 0)
    {
       auto plugins = options.at("plugin").as<std::vector<std::string>>();
@@ -307,8 +362,6 @@ bool application::initialize_impl(int argc, char** argv, vector<abstract_plugin*
       for (auto plugin : autostart_plugins)
          if (plugin != nullptr && plugin->get_state() == abstract_plugin::registered)
             plugin->initialize(options);
-
-      bpo::notify(options);
    } catch (...) {
       std::cerr << "Failed to initialize\n";
       return false;
@@ -329,7 +382,7 @@ void application::shutdown() {
    running_plugins.clear();
    initialized_plugins.clear();
    plugins.clear();
-   io_serv.reset();
+   quit();
 }
 
 void application::quit() {
@@ -341,17 +394,38 @@ bool application::is_quiting() const {
    return my->_is_quiting;
 }
 
-void application::exec() {
-   boost::asio::io_service::work work(*io_serv);
-   (void)work;
-   bool more = true;
-   while( more || io_serv->run_one() ) {
-      while( io_serv->poll_one() ) {}
-      // execute the highest priority item
-      more = pri_queue.execute_highest();
+void application::set_thread_priority_max() {
+#if __has_include(<pthread.h>)
+   pthread_t this_thread = pthread_self();
+   struct sched_param params{};
+   int policy = 0;
+   int ret = pthread_getschedparam(this_thread, &policy, &params);
+   if( ret != 0 ) {
+      std::cerr << "ERROR: Unable to get thread priority" << std::endl;
    }
 
-   shutdown(); /// perform synchronous shutdown
+   params.sched_priority = sched_get_priority_max(policy);
+   ret = pthread_setschedparam(this_thread, policy, &params);
+   if( ret != 0 ) {
+      std::cerr << "ERROR: Unable to set thread priority" << std::endl;
+   }
+#endif
+}
+
+void application::exec() {
+   {
+      boost::asio::io_service::work work(*io_serv);
+      (void)work;
+      bool more = true;
+      while( more || io_serv->run_one() ) {
+         while( io_serv->poll_one() ) {}
+         // execute the highest priority item
+         more = pri_queue.execute_highest();
+      }
+
+      shutdown(); /// perform synchronous shutdown
+   }
+   io_serv.reset();
 }
 
 void application::write_default_config(const bfs::path& cfg_file) {
@@ -374,7 +448,7 @@ void application::print_default_config(std::ostream& os) {
          option_to_plug[opt->long_name()] = plug.second->name();
    }
 
-   for(const boost::shared_ptr<bpo::option_description> od : my->_cfg_options.options())
+   for(const auto& od : my->_cfg_options.options())
    {
       if(!od->description().empty()) {
          std::string desc = od->description();
@@ -397,8 +471,9 @@ void application::print_default_config(std::ostream& os) {
             os << "# " << od->long_name() << " = " << (boost::any_cast<bool&>(store) ? "true" : "false") << std::endl;
          else {
             // The string is formatted "arg (=<interesting part>)"
-            example.erase(0, 6);
-            example.erase(example.length()-1);
+            auto pos = example.find("(=");
+            if(pos != string::npos) example = example.substr(pos+2);
+            if(!example.empty()) example.erase(example.length()-1);
             os << "# " << od->long_name() << " = " << example << std::endl;
          }
       }
@@ -436,6 +511,10 @@ bfs::path application::full_config_file_path() const {
 
 void application::set_sighup_callback(std::function<void()> callback) {
    sighup_callback = callback;
+}
+
+const bpo::variables_map& application::get_options() const{
+      return my->_options;
 }
 
 } /// namespace appbase

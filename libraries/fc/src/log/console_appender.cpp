@@ -6,7 +6,6 @@
 #ifndef WIN32
 #include <unistd.h>
 #endif
-#include <boost/thread/mutex.hpp>
 #define COLOR_CONSOLE 1
 #include "console_defines.h"
 #include <fc/exception/exception.hpp>
@@ -20,9 +19,8 @@ namespace fc {
    class console_appender::impl {
    public:
      config                      cfg;
-     boost::mutex                log_mutex;
      color::type                 lc[log_level::off+1];
-     bool                        use_syslog_header{getenv("JOURNAL_STREAM")};
+     bool                        use_syslog_header{getenv("JOURNAL_STREAM") != nullptr};
 #ifdef WIN32
      HANDLE                      console_handle;
 #endif
@@ -50,10 +48,10 @@ namespace fc {
 #endif
       my->cfg = console_appender_config;
 #ifdef WIN32
-         if (my->cfg.stream = stream::std_error)
-           my->console_handle = GetStdHandle(STD_ERROR_HANDLE);
-         else if (my->cfg.stream = stream::std_out)
-           my->console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+         if (my->cfg.stream == stream::std_error)
+            my->console_handle = GetStdHandle(STD_ERROR_HANDLE);
+         else if (my->cfg.stream == stream::std_out)
+            my->console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
 #endif
 
          for( int i = 0; i < log_level::off+1; ++i )
@@ -96,7 +94,7 @@ namespace fc {
       //fc::string message = fc::format_string( m.get_format(), m.get_data() );
       //fc::variant lmsg(m);
 
-      FILE* out = stream::std_error ? stderr : stdout;
+      FILE* out = my->cfg.stream == stream::std_error ? stderr : stdout;
 
       //fc::string fmt_str = fc::format_string( cfg.format, mutable_variant_object(m.get_context())( "message", message)  );
 
@@ -143,8 +141,6 @@ namespace fc {
       line += "] ";
       line += fc::format_string( m.get_format(), m.get_data() );
 
-      std::unique_lock<boost::mutex> lock(my->log_mutex);
-
       print( line, my->lc[context.get_log_level()] );
 
       fprintf( out, "\n" );
@@ -154,7 +150,7 @@ namespace fc {
 
    void console_appender::print( const std::string& text, color::type text_color )
    {
-      FILE* out = stream::std_error ? stderr : stdout;
+      FILE* out = my->cfg.stream == stream::std_error ? stderr : stdout;
 
       #ifdef WIN32
          if (my->console_handle != INVALID_HANDLE_VALUE)
