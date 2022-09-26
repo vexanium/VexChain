@@ -1,14 +1,46 @@
 {
-    "eosio-lrt":
+    "eosio-code-coverage":
     {
-        "pipeline-branch": "legacy-os"
+        "exclude": [ // ignore coverage reports from source filenames matching these PCREs
+            "^/build/",
+            "^/coverage/",
+            "^/.git/",
+            "^/libraries/eos-vm/",
+            "^/libraries/wasm-jit/",
+            "^/node_modules/",
+            "^/unittests/"
+        ],
+        "expect": [ // expect coverage reports from source filenames matching these PCREs
+            "[.]c(pp)?([.]in)?$",
+            "[.]h(pp)?([.]in)?$"
+        ]
     },
-    "eosio-nightly-builds":
+    "eosio-docker-builds":
     {
-        "pipeline-branch": "legacy-os"
+        "environment":
+        {
+            "BUILDER_TAG": "v2.0.0"
+        }
     },
-    "eosio-base-images":
+    "eos-multiversion-tests":
     {
-        "pipeline-branch": "release/1.7.x"
+        "environment":
+        {
+            "IMAGE_TAG": "_1-8-0-rc2"
+        },
+        "configuration":
+        [
+            "170=v1.7.0"
+        ]
+    },
+    // eosio-resume-from-state documentation: https://github.com/EOSIO/auto-eks-sync-nodes/blob/master/pipelines/eosio-resume-from-state/README.md
+    "eosio-resume-from-state":
+    {
+        "test":
+        [
+            {
+                "commit": "16074742f8cfd481b029073e6f01bb920a1bad38"
+            }
+        ]
     }
 }

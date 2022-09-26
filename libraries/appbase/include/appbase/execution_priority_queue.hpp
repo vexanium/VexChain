@@ -7,9 +7,13 @@ namespace appbase {
 // adapted from: https://www.boost.org/doc/libs/1_69_0/doc/html/boost_asio/example/cpp11/invocation/prioritised_handlers.cpp
 
 struct priority {
-   static constexpr int high = 100;
-   static constexpr int medium = 50;
-   static constexpr int low = 10;
+   static constexpr int lowest      = std::numeric_limits<int>::min();
+   static constexpr int low         = 10;
+   static constexpr int medium_low  = 25;
+   static constexpr int medium      = 50;
+   static constexpr int medium_high = 75;
+   static constexpr int high        = 100;
+   static constexpr int highest     = std::numeric_limits<int>::max();
 };
 
 class execution_priority_queue : public boost::asio::execution_context
@@ -41,6 +45,8 @@ public:
 
       return !handlers_.empty();
    }
+
+   size_t size() { return handlers_.size(); }
 
    class executor
    {
@@ -113,11 +119,13 @@ private:
       virtual void execute() = 0;
 
       int priority() const { return priority_; }
-
-      friend bool operator<(const std::unique_ptr<queued_handler_base>& a,
-                            const std::unique_ptr<queued_handler_base>& b) noexcept
+      // C++20
+      // friend std::weak_ordering operator<=>(const queued_handler_base&,
+      //                                       const queued_handler_base&) noexcept = default;
+      friend bool operator<(const queued_handler_base& a,
+                            const queued_handler_base& b) noexcept
       {
-         return std::tie( a->priority_, a->order_ ) < std::tie( b->priority_, b->order_ );
+         return std::tie( a.priority_, a.order_ ) < std::tie( b.priority_, b.order_ );
       }
 
    private:
@@ -144,7 +152,16 @@ private:
       Function function_;
    };
 
-   std::priority_queue<std::unique_ptr<queued_handler_base>, std::deque<std::unique_ptr<queued_handler_base>>> handlers_;
+   struct deref_less
+   {
+      template<typename Pointer>
+      bool operator()(const Pointer& a, const Pointer& b) noexcept(noexcept(*a < *b))
+      {
+         return *a < *b;
+      }
+   };
+
+   std::priority_queue<std::unique_ptr<queued_handler_base>, std::deque<std::unique_ptr<queued_handler_base>>, deref_less> handlers_;
    std::size_t order_ = std::numeric_limits<size_t>::max(); // to maintain FIFO ordering in queue within priority
 };
 

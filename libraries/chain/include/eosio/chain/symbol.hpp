@@ -1,7 +1,3 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE
- */
 #pragma once
 #include <fc/exception/exception.hpp>
 #include <eosio/chain/types.hpp>
@@ -17,7 +13,7 @@ namespace eosio {
          When encoded as a uint64_t, first byte represents the number of decimals, remaining bytes
          represent token name.
          Name must only include upper case alphabets.
-         from_string constructs a symbol from an input a string of the form "4,VEX"
+         from_string constructs a symbol from an input a string of the form "4,EOS"
          where the integer represents number of decimals. Number of decimals must be larger than zero.
        */
 
@@ -169,6 +165,25 @@ namespace eosio {
          return lhs.value() > rhs.value();
       }
 
+      inline bool operator== (const extended_symbol& lhs, const extended_symbol& rhs)
+      {
+         return std::tie(lhs.sym, lhs.contract) == std::tie(rhs.sym, rhs.contract);
+      }
+
+      inline bool operator!= (const extended_symbol& lhs, const extended_symbol& rhs)
+      {
+         return std::tie(lhs.sym, lhs.contract) != std::tie(rhs.sym, rhs.contract);
+      }
+
+      inline bool operator< (const extended_symbol& lhs, const extended_symbol& rhs)
+      {
+         return std::tie(lhs.sym, lhs.contract) < std::tie(rhs.sym, rhs.contract);
+      }
+
+      inline bool operator> (const extended_symbol& lhs, const extended_symbol& rhs)
+      {
+         return std::tie(lhs.sym, lhs.contract) > std::tie(rhs.sym, rhs.contract);
+      }
    } // namespace chain
 } // namespace eosio
 

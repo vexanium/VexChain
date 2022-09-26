@@ -2,6 +2,7 @@
 #include <fc/static_variant.hpp>
 #include <fc/crypto/elliptic.hpp>
 #include <fc/crypto/elliptic_r1.hpp>
+#include <fc/crypto/elliptic_webauthn.hpp>
 #include <fc/reflect/reflect.hpp>
 #include <fc/reflect/variant.hpp>
 
@@ -10,14 +11,15 @@ namespace fc { namespace crypto {
       constexpr const char* signature_base_prefix = "SIG";
       constexpr const char* signature_prefix[] = {
          "K1",
-         "R1"
+         "R1",
+         "WA"
       };
    };
 
    class signature
    {
       public:
-         using storage_type = static_variant<ecc::signature_shim, r1::signature_shim>;
+         using storage_type = std::variant<ecc::signature_shim, r1::signature_shim, webauthn::signature>;
 
          signature() = default;
          signature( signature&& ) = default;
@@ -26,7 +28,11 @@ namespace fc { namespace crypto {
 
          // serialize to/from string
          explicit signature(const string& base58str);
-         explicit operator string() const;
+         std::string to_string(const fc::yield_function_t& yield = fc::yield_function_t()) const;
+
+         int which() const;
+
+         size_t variable_size() const;
 
       private:
          storage_type _storage;
@@ -49,7 +55,7 @@ namespace fc { namespace crypto {
 } }  // fc::crypto
 
 namespace fc {
-   void to_variant(const crypto::signature& var,  variant& vo);
+   void to_variant(const crypto::signature& var, variant& vo, const fc::yield_function_t& yield = fc::yield_function_t());
 
    void from_variant(const variant& var, crypto::signature& vo);
 } // namespace fc

@@ -40,6 +40,10 @@ namespace fc { namespace raw {
          {
             fc::raw::pack( s, v );
          }
+         virtual void handle( const blob& v)const
+         {
+            fc::raw::pack( s, v );
+         }
         
          Stream& s;
         
@@ -106,6 +110,13 @@ namespace fc { namespace raw {
          case variant::object_type:
          {
             variant_object val; 
+            raw::unpack(s,val);
+            v = fc::move(val);
+            return;
+         }
+         case variant::blob_type:
+         {
+            blob val;
             raw::unpack(s,val);
             v = fc::move(val);
             return;

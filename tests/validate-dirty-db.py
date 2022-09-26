@@ -9,7 +9,10 @@ import subprocess
 import signal
 
 ###############################################################
+# validate-dirty-db
+#
 # Test for validating the dirty db flag sticks repeated nodeos restart attempts
+#
 ###############################################################
 
 
@@ -74,7 +77,7 @@ try:
         pnodes, topo, delay, chainSyncStrategyStr))
 
     Print("Stand up cluster")
-    if cluster.launch(pnodes, total_nodes, topo=topo, delay=delay, dontBootstrap=True) is False:
+    if cluster.launch(pnodes=pnodes, totalNodes=total_nodes, topo=topo, delay=delay, dontBootstrap=True) is False:
         errorExit("Failed to stand up eos cluster.")
 
     node=cluster.getNode(0)
@@ -99,8 +102,8 @@ try:
         retCode=ret[1]["returncode"]
         expectedRetCode=2
         if retCode != expectedRetCode:
-            errorExit("Expected return code to be %d, but instead received %d." % (expectedRetCode, retCode))
-        db_dirty_msg="database dirty flag set"
+            errorExit("Expected return code to be %d, but instead received %d. output={\n%s\n}" % (expectedRetCode, retCode, ret))
+        db_dirty_msg="atabase dirty flag set"
         if db_dirty_msg not in stderr:
             errorExit("stderr should have contained \"%s\" but it did not. stderr=\n%s" % (db_dirty_msg, stderr))
 

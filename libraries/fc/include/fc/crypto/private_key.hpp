@@ -19,7 +19,7 @@ namespace fc { namespace crypto {
    class private_key
    {
       public:
-         using storage_type = static_variant<ecc::private_key_shim, r1::private_key_shim>;
+         using storage_type = std::variant<ecc::private_key_shim, r1::private_key_shim>;
 
          private_key() = default;
          private_key( private_key&& ) = default;
@@ -47,7 +47,7 @@ namespace fc { namespace crypto {
 
          // serialize to/from string
          explicit private_key(const string& base58str);
-         explicit operator string() const;
+         std::string to_string(const fc::yield_function_t& yield = fc::yield_function_t()) const;
 
       private:
          storage_type _storage;
@@ -65,7 +65,7 @@ namespace fc { namespace crypto {
 } }  // fc::crypto
 
 namespace fc {
-   void to_variant(const crypto::private_key& var,  variant& vo);
+   void to_variant(const crypto::private_key& var, variant& vo, const fc::yield_function_t& yield = fc::yield_function_t());
 
    void from_variant(const variant& var, crypto::private_key& vo);
 } // namespace fc

@@ -1,9 +1,4 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE
- */
 #include <eosio/test_control_plugin/test_control_plugin.hpp>
-#include <fc/optional.hpp>
 #include <atomic>
 
 namespace fc { class variant; }
@@ -23,11 +18,10 @@ public:
 private:
    void accepted_block(const chain::block_state_ptr& bsp);
    void applied_irreversible_block(const chain::block_state_ptr& bsp);
-   void retrieve_next_block_state(const chain::block_state_ptr& bsp);
-   void process_next_block_state(const chain::block_header_state& bhs);
+   void process_next_block_state(const chain::block_state_ptr& bsp);
 
-   fc::optional<boost::signals2::scoped_connection> _accepted_block_connection;
-   fc::optional<boost::signals2::scoped_connection> _irreversible_block_connection;
+   std::optional<boost::signals2::scoped_connection> _accepted_block_connection;
+   std::optional<boost::signals2::scoped_connection> _irreversible_block_connection;
    chain::controller&  _chain;
    account_name        _producer;
    int32_t             _where_in_sequence;
@@ -55,26 +49,18 @@ void test_control_plugin_impl::disconnect() {
 
 void test_control_plugin_impl::applied_irreversible_block(const chain::block_state_ptr& bsp) {
    if (_track_lib)
-      retrieve_next_block_state(bsp);
+      process_next_block_state(bsp);
 }
 
 void test_control_plugin_impl::accepted_block(const chain::block_state_ptr& bsp) {
    if (_track_head)
-      retrieve_next_block_state(bsp);
+      process_next_block_state(bsp);
 }
 
-void test_control_plugin_impl::retrieve_next_block_state(const chain::block_state_ptr& bsp) {
-   const auto hbn = bsp->block_num;
-   auto new_block_header = bsp->header;
-   new_block_header.timestamp = new_block_header.timestamp.next();
-   new_block_header.previous = bsp->id;
-   auto new_bs = bsp->generate_next(new_block_header.timestamp);
-   process_next_block_state(new_bs);
-}
-
-void test_control_plugin_impl::process_next_block_state(const chain::block_header_state& bhs) {
+void test_control_plugin_impl::process_next_block_state(const chain::block_state_ptr& bsp) {
    const auto block_time = _chain.head_block_time() + fc::microseconds(chain::config::block_interval_us);
-   const auto& producer_name = bhs.get_scheduled_producer(block_time).producer_name;
+   const auto& producer_authority = bsp->get_scheduled_producer(block_time);
+   const auto producer_name = producer_authority.producer_name;
    if (_producer != account_name())
       ilog("producer ${cprod}, looking for ${lprod}", ("cprod", producer_name.to_string())("lprod", _producer.to_string()));
 

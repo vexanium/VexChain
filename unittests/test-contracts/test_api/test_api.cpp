@@ -1,9 +1,5 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE
- */
-#include <eosiolib/eosio.hpp>
-#include <eosiolib/transaction.hpp>
+#include <eosio/eosio.hpp>
+#include <eosio/transaction.hpp>
 
 #include "test_api.hpp"
 
@@ -21,7 +17,7 @@ name global_receiver;
 
 extern "C" {
    void apply( uint64_t receiver, uint64_t code, uint64_t action ) {
-      if( code == "eosio"_n.value && action == "onerror"_n.value ) {
+      if( code == "vexcore"_n.value && action == "onerror"_n.value ) {
          auto error = eosio::onerror::from_current_action();
          eosio::print("onerror called\n");
          auto error_trx = error.unpack_sent_trx();
@@ -41,7 +37,8 @@ extern "C" {
       }
       WASM_TEST_HANDLER( test_action, assert_true_cf );
 
-      if ( action != WASM_TEST_ACTION("test_transaction", "stateful_api") && action != WASM_TEST_ACTION("test_transaction", "context_free_api") )
+      if ( action != WASM_TEST_ACTION("test_transaction", "stateful_api") &&
+           action != WASM_TEST_ACTION("test_transaction", "context_free_api") )
          require_auth(code);
 
       //test_types
@@ -64,6 +61,12 @@ extern "C" {
       WASM_TEST_HANDLER   ( test_action, test_publication_time      );
       WASM_TEST_HANDLER   ( test_action, test_assert_code           );
       WASM_TEST_HANDLER_EX( test_action, test_ram_billing_in_notify );
+      WASM_TEST_HANDLER_EX( test_action, test_action_ordinal1       );
+      WASM_TEST_HANDLER_EX( test_action, test_action_ordinal2       );
+      WASM_TEST_HANDLER_EX( test_action, test_action_ordinal3       );
+      WASM_TEST_HANDLER_EX( test_action, test_action_ordinal4       );
+      WASM_TEST_HANDLER_EX( test_action, test_action_ordinal_foo    );
+      WASM_TEST_HANDLER_EX( test_action, test_action_ordinal_bar    );
 
       // test named actions
       // We enforce action name matches action data type name, so name mangling will not work for these tests.
@@ -85,6 +88,7 @@ extern "C" {
 
       //test crypto
       WASM_TEST_HANDLER( test_crypto, test_recover_key              );
+      WASM_TEST_HANDLER( test_crypto, test_recover_key_partial      );
       WASM_TEST_HANDLER( test_crypto, test_recover_key_assert_true  );
       WASM_TEST_HANDLER( test_crypto, test_recover_key_assert_false );
       WASM_TEST_HANDLER( test_crypto, test_sha1                     );
@@ -112,6 +116,7 @@ extern "C" {
       WASM_TEST_HANDLER   ( test_transaction, send_action_inline_fail                );
       WASM_TEST_HANDLER   ( test_transaction, send_action_empty                      );
       WASM_TEST_HANDLER   ( test_transaction, send_action_large                      );
+      WASM_TEST_HANDLER   ( test_transaction, send_action_4k                         );
       WASM_TEST_HANDLER   ( test_transaction, send_action_recurse                    );
       WASM_TEST_HANDLER   ( test_transaction, test_read_transaction                  );
       WASM_TEST_HANDLER   ( test_transaction, test_transaction_size                  );
@@ -122,6 +127,7 @@ extern "C" {
       WASM_TEST_HANDLER_EX( test_transaction, send_action_sender                     );
       WASM_TEST_HANDLER   ( test_transaction, deferred_print                         );
       WASM_TEST_HANDLER_EX( test_transaction, send_deferred_transaction              );
+      WASM_TEST_HANDLER_EX( test_transaction, send_deferred_transaction_4k_action    );
       WASM_TEST_HANDLER_EX( test_transaction, send_deferred_transaction_replace      );
       WASM_TEST_HANDLER   ( test_transaction, send_deferred_tx_with_dtt_action       );
       WASM_TEST_HANDLER   ( test_transaction, cancel_deferred_transaction_success    );
@@ -156,7 +162,7 @@ extern "C" {
       WASM_TEST_HANDLER_EX( test_permission, test_account_creation_time );
 
       //unhandled test call
-      eosio_assert( false, "Unknown Test" );
+      eosio_assert( false, "Unknown Test ahhh!" );
 
    }
 }

@@ -1,7 +1,3 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE
- */
 #include <appbase/application.hpp>
 #include <eosio/wallet_plugin/wallet_manager.hpp>
 #include <eosio/wallet_plugin/wallet.hpp>
@@ -16,7 +12,7 @@ constexpr auto password_prefix = "PW";
 
 std::string gen_password() {
    auto key = private_key_type::generate();
-   return password_prefix + string(key);
+   return password_prefix + key.to_string();
 
 }
 
@@ -30,7 +26,7 @@ wallet_manager::wallet_manager() {
 #ifdef __APPLE__
    try {
       wallets.emplace("SecureEnclave", std::make_unique<se_wallet>());
-   } catch(fc::exception& ) {}
+   } catch(const std::exception& ) {}
 #endif
 }
 
@@ -237,7 +233,7 @@ wallet_manager::sign_transaction(const chain::signed_transaction& txn, const fla
       bool found = false;
       for (const auto& i : wallets) {
          if (!i.second->is_locked()) {
-            optional<signature_type> sig = i.second->try_sign_digest(stxn.sig_digest(id, stxn.context_free_data), pk);
+            std::optional<signature_type> sig = i.second->try_sign_digest(stxn.sig_digest(id, stxn.context_free_data), pk);
             if (sig) {
                stxn.signatures.push_back(*sig);
                found = true;
@@ -260,7 +256,7 @@ wallet_manager::sign_digest(const chain::digest_type& digest, const public_key_t
    try {
       for (const auto& i : wallets) {
          if (!i.second->is_locked()) {
-            optional<signature_type> sig = i.second->try_sign_digest(digest, key);
+            std::optional<signature_type> sig = i.second->try_sign_digest(digest, key);
             if (sig)
                return *sig;
          }

@@ -34,6 +34,17 @@ namespace appbase {
           * @return A string worthy of output with -v/--version, or "Unknown" if git not available
           */
          string version_string() const;
+         /** @brief User provided version string for version_string() which overrides git describe value.
+          */
+         void set_version_string(std::string v);
+         /** @brief Get full version string; same as version_string() unless set differently.
+          *
+          * @return A string worthy of output with -v/--version, or "Unknown" if git not available
+          */
+         string full_version_string() const;
+         /** @brief User provided full version string for full_version_string()
+          */
+         void set_full_version_string(std::string v);
          /** @brief Set default data directory
           *
           * @param data_dir Default data directory to use if not specified
@@ -90,7 +101,6 @@ namespace appbase {
          }
 
          void                  startup();
-         void                  shutdown();
 
          /**
           *  Wait until quit(), SIGINT or SIGTERM and then shutdown.
@@ -217,6 +227,14 @@ namespace appbase {
             return pri_queue;
          }
 
+         const bpo::variables_map& get_options() const;
+
+         /**
+          * Set the current thread schedule priority to maximum.
+          * Works for pthreads.
+          */
+         void set_thread_priority_max();
+
       protected:
          template<typename Impl>
          friend class plugin;
@@ -244,13 +262,15 @@ namespace appbase {
          std::shared_ptr<boost::asio::io_service>  io_serv;
          execution_priority_queue                  pri_queue;
 
-         void start_sighup_handler();
+         void start_sighup_handler( std::shared_ptr<boost::asio::signal_set> sighup_set );
          void set_program_options();
          void write_default_config(const bfs::path& cfg_file);
          void print_default_config(std::ostream& os);
 
          void wait_for_signal(std::shared_ptr<boost::asio::signal_set> ss);
-         void setup_signal_handling_on_ios(boost::asio::io_service& ios);
+         void setup_signal_handling_on_ios(boost::asio::io_service& ios, bool startup);
+
+         void shutdown();
 
          std::unique_ptr<class application_impl> my;
 

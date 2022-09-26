@@ -1,11 +1,7 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE
- */
 #pragma once
 
 #include <string>
-
+#include "../capi/eosio/types.h"
 #include "test_api_common.hpp"
 
 namespace eosio { class transaction; }
@@ -29,6 +25,50 @@ namespace eosio { class transaction; }
    if( error_action == name{WASM_TEST_ACTION(CALLED_CLASS_STR, CALLED_METHOD_STR)} ) { \
    HANDLER_CLASS::HANDLER_METHOD(error_trx); \
    return; \
+}
+
+extern "C" {
+    __attribute__((eosio_wasm_import))
+    void set_action_return_value(const char*, size_t);
+
+    __attribute__((eosio_wasm_import))
+    void  eosio_assert( uint32_t test, const char* msg );
+
+    __attribute__((eosio_wasm_import))
+    void  eosio_assert_code( uint32_t test, uint64_t code );
+
+    __attribute__((eosio_wasm_import))
+    uint64_t  current_time();
+
+    __attribute__((eosio_wasm_import))
+    int get_action( uint32_t type, uint32_t index, char* buff, size_t size );
+
+    //db.h
+    __attribute__((eosio_wasm_import))
+    int32_t db_store_i64(uint64_t scope, capi_name table, capi_name payer, uint64_t id,  const void* data, uint32_t len);
+
+    __attribute__((eosio_wasm_import))
+    int32_t db_find_i64(capi_name code, uint64_t scope, capi_name table, uint64_t id);
+
+    __attribute__((eosio_wasm_import))
+    int32_t db_idx64_store(uint64_t scope, capi_name table, capi_name payer, uint64_t id, const uint64_t* secondary);
+
+    __attribute__((eosio_wasm_import))
+    void db_remove_i64(int32_t iterator);
+
+    __attribute__((eosio_wasm_import))
+    int32_t db_lowerbound_i64(capi_name code, uint64_t scope, capi_name table, uint64_t id);
+
+    __attribute__((eosio_wasm_import))
+    void db_update_i64(int32_t iterator, capi_name payer, const void* data, uint32_t len);
+
+    //privilege.h
+    __attribute__((eosio_wasm_import))
+    bool is_privileged( capi_name account );
+
+    // chain.h
+    __attribute__((eosio_wasm_import))
+    uint32_t get_active_producers( capi_name* producers, uint32_t datalen );
 }
 
 struct test_types {
@@ -69,6 +109,12 @@ struct test_action {
    static void test_publication_time();
    static void test_assert_code();
    static void test_ram_billing_in_notify(uint64_t receiver, uint64_t code, uint64_t action);
+   static void test_action_ordinal1(uint64_t receiver, uint64_t code, uint64_t action);
+   static void test_action_ordinal2(uint64_t receiver, uint64_t code, uint64_t action);
+   static void test_action_ordinal3(uint64_t receiver, uint64_t code, uint64_t action);
+   static void test_action_ordinal4(uint64_t receiver, uint64_t code, uint64_t action);
+   static void test_action_ordinal_foo(uint64_t receiver, uint64_t code, uint64_t action);
+   static void test_action_ordinal_bar(uint64_t receiver, uint64_t code, uint64_t action);
 };
 
 struct test_db {
@@ -126,6 +172,7 @@ struct test_multi_index {
 
 struct test_crypto {
    static void test_recover_key();
+   static void test_recover_key_partial();
    static void test_recover_key_assert_true();
    static void test_recover_key_assert_false();
    static void test_sha1();
@@ -154,6 +201,7 @@ struct test_transaction {
    static void send_action_empty();
    static void send_action_max();
    static void send_action_large();
+   static void send_action_4k();
    static void send_action_recurse();
    static void send_action_inline_fail();
    static void test_read_transaction();
@@ -167,6 +215,7 @@ struct test_transaction {
    static void send_action_sender(uint64_t receiver, uint64_t code, uint64_t action);
    static void deferred_print();
    static void send_deferred_transaction(uint64_t receiver, uint64_t code, uint64_t action);
+   static void send_deferred_transaction_4k_action(uint64_t receiver, uint64_t code, uint64_t action);
    static void send_deferred_transaction_replace(uint64_t receiver, uint64_t code, uint64_t action);
    static void send_deferred_tx_with_dtt_action();
    static void cancel_deferred_transaction_success();

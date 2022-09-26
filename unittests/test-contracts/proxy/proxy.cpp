@@ -1,7 +1,3 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE
- */
 #include "proxy.hpp"
 #include <eosio/transaction.hpp>
 
@@ -36,7 +32,7 @@ void proxy::on_transfer( name from, name to, asset quantity, const std::string& 
       _config.set( cfg, self );
 
       transaction out;
-      eosio::token::transfer_action a( "eosio.token"_n, {self, "active"_n} );
+      eosio::token::transfer_action a( "vex.token"_n, {self, "active"_n} );
       out.actions.emplace_back( a.to_action( self, cfg.owner, quantity, memo ) );
       out.delay_sec = cfg.delay;
       out.send( id, self );
@@ -59,6 +55,7 @@ void proxy::on_error( uint128_t sender_id, eosio::ignore<std::vector<char>> ) {
    get_datastream() >> packed_trx_size;
    transaction trx;
    get_datastream() >> trx;
+   trx.transaction_extensions.clear();
 
    trx.delay_sec = cfg.delay;
    trx.send( id, get_self() );
