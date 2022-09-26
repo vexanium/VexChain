@@ -4,11 +4,8 @@
 *.ll
 *.bc
 *.wast
-*.wast.hpp
-*.s
 *.dot
-*.abi.hpp
-*.cmake
+!.cicd
 *.ninja
 \#*
 \.#*
@@ -21,6 +18,7 @@ Makefile
 compile_commands.json
 moc_*
 *.moc
+.clangd/
 
 genesis.json
 hardfork.hpp
@@ -72,6 +70,8 @@ witness_node_data_dir
 *.pyc
 *.pyo
 
+Testing/*
+build.tar.gz
 build/*
 build-debug/*
 
@@ -81,3 +81,5 @@ var/lib/node_*
 .idea/
 *.iws
 .DS_Store
+
+!*.swagger.*
