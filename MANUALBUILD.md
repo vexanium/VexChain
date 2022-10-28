@@ -1,1 +1,0 @@
-# VexChain Manual build
