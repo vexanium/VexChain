@@ -42,7 +42,7 @@ VEXCHAIN currently supports the following operating systems:
 
 ## Software Installation
 
-If you are new to VEXCHAIN, it is recommended that you install the [VEXCHAIN Prebuilt Binaries](#prebuilt-binaries). If you are an advanced developer, a block producer, or no binaries are available for your platform, you may need to [Build VEXCHAIN from source](https://github.com/vexanium/VexChain/edit/main/README.md#manual-build).
+If you are new to VEXCHAIN, it is recommended that you install the [VEXCHAIN Prebuilt Binaries](#prebuilt-binaries). If you are an advanced developer, a block producer, or no binaries are available for your platform, you may need to [Build VEXCHAIN from source]([https://github.com/vexanium/VexChain/main/README.md#manual-](https://github.com/vexanium/VexChain/blob/main/README.md#manual-build)build).
 
 ---
 
