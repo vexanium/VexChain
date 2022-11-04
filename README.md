@@ -33,6 +33,7 @@ VEXCHAIN currently supports the following operating systems:
 4. Ubuntu 20.04
 5. MacOS 10.14 (Mojave)
 6. MacOS 10.15 (Catalina)
+7. MacOS 13.0 (Ventura)
 
 ---
 
