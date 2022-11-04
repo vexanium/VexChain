@@ -8,9 +8,9 @@ if [[ -z "$VERS" ]]; then
       echo "Error, unsupported OS X version"
       exit -1
    fi
-   MAC_VERSION="Ventura"
+   MAC_VERSION="ventura"
 else
-   MAC_VERSION="Catalina"
+   MAC_VERSION="catalina"
 fi
 
 NAME="${PROJECT}-${VERSION}.${MAC_VERSION}.bottle"
@@ -44,7 +44,7 @@ echo "class Vex < Formula
    depends_on \"openssl@1.1\"
    depends_on \"libusb\"
    depends_on \"libpqxx\"
-   depends_on :macos => :mojave
+   depends_on :macos => :catalina
    depends_on :arch =>  :intel
 
    bottle do
