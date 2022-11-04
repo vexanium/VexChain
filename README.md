@@ -97,8 +97,7 @@ sudo apt remove vex
 ```sh
 git clone https://github.com/vexanium/VexChain
 cd VexChain
-./scripts/
-io_build.sh
+./scripts/eosio_build.sh
 ./scripts/eosio_install.sh
 ```
 
