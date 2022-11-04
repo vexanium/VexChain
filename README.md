@@ -58,7 +58,7 @@ Prebuilt VEXCHAIN software packages are available for the operating systems belo
 
 #### Mac OS X Brew Install
 ```sh
-brew tap vex/vexanium
+brew tap vexanium/vex
 brew install vex
 ```
 Note: On MacOS 10.15 (Catalina), there is a chance to face the linking error below which prevents successful installation of VEXCHAIN:
