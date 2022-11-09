@@ -30,8 +30,7 @@ fi
 
 curl -X POST $url/v1/producer/schedule_protocol_feature_activations -d '{"protocol_features_to_activate": ["0ec7e080177b2c02b278d5088611686b49d739925a92d9bfcacd7fc6b74053bd"]}'
 sleep 1s
-cleos set contract vexcore $contracts_dir/
-.boot -p vexcore@active
+cleos set contract vexcore $contracts_dir/eosio.boot -p eosio@active
 sleep 1s
 sleep 1s
 sleep 1s
